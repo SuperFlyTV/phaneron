@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
+use std::time::SystemTime;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
@@ -300,6 +301,7 @@ async fn write_video_to_track<'a>(t: Arc<TrackLocalStaticSample>, data: Bytes) {
     t.write_sample(&Sample {
         data,
         duration: Duration::from_millis(40),
+        timestamp: SystemTime::now(),
         ..Default::default()
     })
     .await
@@ -310,6 +312,7 @@ async fn write_audio_to_track<'a>(t: Arc<TrackLocalStaticSample>, data: Bytes) {
     t.write_sample(&Sample {
         data,
         duration: Duration::from_millis(40),
+        timestamp: SystemTime::now(),
         ..Default::default()
     })
     .await

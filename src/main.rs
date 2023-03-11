@@ -1,7 +1,7 @@
 use std::fs;
 
 use phaneron::{
-    AudioPipe, FFmpegProducerConfiguration, NodeContext, PhaneronState,
+    create_phaneron_state, AudioPipe, FFmpegProducerConfiguration, NodeContext,
     TraditionalMixerEmulatorConfiguration, TraditionalMixerEmulatorState,
 };
 use serde::Deserialize;
@@ -49,7 +49,7 @@ async fn main() {
     info!("👋 Welcome to Phaneron version {phaneron_version}");
 
     let context = phaneron::create_compute_context().await;
-    let state = PhaneronState::new(context.clone());
+    let state = create_phaneron_state(context.clone());
 
     info!("Loading plugins");
     let mut ffmpeg_producer_plugin = phaneron::FFmpegProducerPlugin::load();
@@ -68,7 +68,7 @@ async fn main() {
     let active_input_webrtc_consumer_context = NodeContext::new(
         active_input_webrtc_consumer_id.clone(),
         context.clone(),
-        state.clone(),
+        state.get_node_event_channel().await,
     );
     let mut active_input_webrtc_consumer = webrtc_consumer_plugin
         .create_node(active_input_webrtc_consumer_id.clone())
@@ -90,7 +90,7 @@ async fn main() {
     let traditional_switcher_emulator_context = NodeContext::new(
         traditional_switcher_emulator_id.clone(),
         context.clone(),
-        state.clone(),
+        state.get_node_event_channel().await,
     );
     let mut traditional_switcher_emulator = traditional_mixer_emulator_plugin
         .create_node(traditional_switcher_emulator_id.clone())
@@ -116,8 +116,11 @@ async fn main() {
     let mut audio_pipe: Option<AudioPipe> = None;
     for (i, input) in video_inputs.videos.iter().enumerate() {
         let ffmpeg_producer_id = phaneron::NodeId::default();
-        let ffmpeg_producer_context =
-            NodeContext::new(ffmpeg_producer_id.clone(), context.clone(), state.clone());
+        let ffmpeg_producer_context = NodeContext::new(
+            ffmpeg_producer_id.clone(),
+            context.clone(),
+            state.get_node_event_channel().await,
+        );
         let mut ffmpeg_producer = ffmpeg_producer_plugin
             .create_node(ffmpeg_producer_id.clone())
             .await;

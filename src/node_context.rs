@@ -16,7 +16,6 @@ use crate::{
     format::VideoFormat,
     graph::{AudioInputId, AudioOutputId, NodeId, VideoInputId, VideoOutputId},
     io::{FromRGBA, InterlaceMode, ToRGBA},
-    state::PhaneronState,
 };
 
 pub struct NodeContext {
@@ -25,10 +24,14 @@ pub struct NodeContext {
 }
 
 impl NodeContext {
-    pub fn new(node_id: NodeId, context: PhaneronComputeContext, state: PhaneronState) -> Self {
+    pub fn new(
+        node_id: NodeId,
+        context: PhaneronComputeContext,
+        state_tx: tokio::sync::mpsc::UnboundedSender<NodeEvent>,
+    ) -> Self {
         Self {
             node_id: node_id.clone(),
-            inner: Arc::new(NodeContextInner::new(node_id, context, state)),
+            inner: Arc::new(NodeContextInner::new(node_id, context, state_tx)),
         }
     }
 
@@ -68,11 +71,14 @@ impl NodeContext {
         if audio_input_ids.contains(&audio_input_id) {
             Err(AddAudioInputError::InputAlreadyExists)
         } else {
-            self.inner
-                .state
-                .audio_input_added(&self.inner.node_id, audio_input_id.clone())
-                .await;
             audio_input_ids.push(audio_input_id.clone());
+            self.inner
+                .state_tx
+                .send(NodeEvent::AudioInputAdded(
+                    self.node_id.clone(),
+                    audio_input_id.clone(),
+                ))
+                .ok(); // If receiver is dropped, not much we can do
             Ok(())
         }
     }
@@ -85,11 +91,14 @@ impl NodeContext {
         if video_input_ids.contains(&video_input_id) {
             Err(AddVideoInputError::InputAlreadyExists)
         } else {
-            self.inner
-                .state
-                .video_input_added(&self.inner.node_id, video_input_id.clone())
-                .await;
             video_input_ids.push(video_input_id.clone());
+            self.inner
+                .state_tx
+                .send(NodeEvent::VideoInputAdded(
+                    self.node_id.clone(),
+                    video_input_id.clone(),
+                ))
+                .ok(); // If receiver is dropped, not much we can do
             Ok(())
         }
     }
@@ -103,9 +112,12 @@ impl NodeContext {
             .await
             .insert(audio_output_id.clone(), channel.clone());
         self.inner
-            .state
-            .audio_output_added(&self.inner.node_id, audio_output_id.clone())
-            .await;
+            .state_tx
+            .send(NodeEvent::AudioOutputAdded(
+                self.node_id.clone(),
+                audio_output_id.clone(),
+            ))
+            .ok(); // If receiver is dropped, not much we can do
 
         AudioOutput::new(
             NodeContext {
@@ -125,9 +137,12 @@ impl NodeContext {
             .await
             .insert(video_output_id.clone(), channel.clone());
         self.inner
-            .state
-            .video_output_added(&self.inner.node_id, video_output_id.clone())
-            .await;
+            .state_tx
+            .send(NodeEvent::VideoOutputAdded(
+                self.node_id.clone(),
+                video_output_id.clone(),
+            ))
+            .ok(); // If receiver is dropped, not much we can do
 
         VideoOutput::new(
             NodeContext {
@@ -277,10 +292,21 @@ impl Clone for NodeContext {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum NodeEvent {
+    StateChanged(NodeId, String),
+    AudioInputAdded(NodeId, AudioInputId),
+    VideoInputAdded(NodeId, VideoInputId),
+    AudioOutputAdded(NodeId, AudioOutputId),
+    VideoOutputAdded(NodeId, VideoOutputId),
+    VideoPipeConnected(NodeId, VideoInputId, VideoOutputId),
+    AudioPipeConnected(NodeId, AudioInputId, AudioOutputId),
+}
+
 struct NodeContextInner {
     node_id: NodeId,
     context: PhaneronComputeContext,
-    state: PhaneronState,
+    state_tx: tokio::sync::mpsc::UnboundedSender<NodeEvent>,
     audio_input_ids: Arc<Mutex<Vec<AudioInputId>>>,
     audio_outputs: Arc<Mutex<HashMap<AudioOutputId, Channel<AudioFrame>>>>,
     video_input_ids: Arc<Mutex<Vec<VideoInputId>>>,
@@ -292,11 +318,15 @@ struct NodeContextInner {
 }
 
 impl NodeContextInner {
-    pub fn new(node_id: NodeId, context: PhaneronComputeContext, state: PhaneronState) -> Self {
+    pub fn new(
+        node_id: NodeId,
+        context: PhaneronComputeContext,
+        state_tx: tokio::sync::mpsc::UnboundedSender<NodeEvent>,
+    ) -> Self {
         Self {
             node_id,
-            state,
             context,
+            state_tx,
             audio_input_ids: Default::default(),
             audio_outputs: Default::default(),
             video_input_ids: Default::default(),
@@ -330,9 +360,13 @@ impl NodeContextInner {
         }
 
         connected_video_pipes.insert(to_video_input.clone(), (video_pipe_id.clone(), video_pipe));
-        self.state
-            .video_pipe_connected(to_video_input.clone(), video_pipe_id.clone())
-            .await;
+        self.state_tx
+            .send(NodeEvent::VideoPipeConnected(
+                self.node_id.clone(),
+                to_video_input.clone(),
+                video_pipe_id.clone(),
+            ))
+            .ok(); // If receiver is dropped, not much we can do
 
         Ok(())
     }
@@ -359,6 +393,13 @@ impl NodeContextInner {
         }
 
         connected_audio_pipes.insert(to_audio_input.clone(), (audio_pipe_id.clone(), audio_pipe));
+        self.state_tx
+            .send(NodeEvent::AudioPipeConnected(
+                self.node_id.clone(),
+                to_audio_input.clone(),
+                audio_pipe_id.clone(),
+            ))
+            .ok(); // If receiver is dropped, not much we can do
 
         Ok(())
     }
@@ -485,6 +526,7 @@ pub async fn run_node(
     node_context: NodeContext,
     node: Box<dyn Node>,
     pending_state: Arc<tokio::sync::Mutex<Option<String>>>,
+    node_event_tx: tokio::sync::mpsc::UnboundedSender<NodeEvent>,
 ) {
     let mut previous_black_frame: Option<(usize, usize, VideoFrame)> = None;
     let mut previous_silence_frame: Option<AudioFrame> = None;
@@ -511,9 +553,13 @@ pub async fn run_node(
         }
 
         if let Some(state) = pending_state.lock().await.take() {
-            let applied = node.apply_state(state).await;
+            let applied = node.apply_state(state.clone()).await;
             if applied {
-                // TODO: Send event for applied statae
+                node_event_tx
+                    .send(NodeEvent::StateChanged(node_context.node_id.clone(), state))
+                    .ok();
+            } else {
+                // TODO: Event
             }
         }
 

@@ -9,7 +9,7 @@ pub use plugins::ffmpeg_producer::FFmpegProducerPlugin;
 pub use plugins::traditional_mixer_emulator::TraditionalMixerEmulatorPlugin;
 pub use plugins::turbo_consumer::TurboConsumerPlugin;
 pub use plugins::webrtc_consumer::WebRTCConsumerPlugin;
-pub use state::PhaneronState;
+pub use state::{create_phaneron_state, PhaneronState};
 
 // TODO: Remove
 pub use plugins::ffmpeg_producer::FFmpegProducerConfiguration;

@@ -210,7 +210,7 @@ impl Node for WebRTCConsumer {
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
             interval
         });
-        interval.tick().await;
+
         let mut from_rgba_lock = self.from_rgba.lock().await;
         let from_rgba = from_rgba_lock.get_or_insert(context.as_ref().unwrap().create_from_rgba(
             &VideoFormat::YUV420p,
@@ -275,6 +275,8 @@ impl Node for WebRTCConsumer {
 
             out[0..bytes].to_vec()
         };
+
+        interval.tick().await;
 
         let audio_tracks_lock = self.audio_tracks.lock().await;
         if let Some(audio_tracks) = &*audio_tracks_lock {

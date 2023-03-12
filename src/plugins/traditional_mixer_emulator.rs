@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::{
-    compute::{audio_frame::AudioFrame, video_frame::VideoFrame, video_stream::VideoOutput},
+    compute::{audio_frame::AudioFrame, video_frame::VideoFrame, video_output::VideoOutput},
     dissolve::Dissolve,
     graph::{AudioInputId, AudioOutputId, NodeId, VideoInputId, VideoOutputId},
     node_context::{Node, NodeContext, ProcessFrameContext},
@@ -51,7 +51,7 @@ pub struct TraditionalMixerEmlator {
     node_id: NodeId,
     context: Mutex<Option<NodeContext>>,
     state: Mutex<Option<TraditionalMixerEmulatorState>>,
-    active_output_stream: Mutex<Option<VideoOutput>>,
+    active_video_output: Mutex<Option<VideoOutput>>,
     video_transition: Mutex<Option<Dissolve>>,
 }
 
@@ -61,7 +61,7 @@ impl TraditionalMixerEmlator {
             node_id,
             context: Default::default(),
             state: Default::default(),
-            active_output_stream: Default::default(),
+            active_video_output: Default::default(),
             video_transition: Default::default(),
         }
     }
@@ -86,11 +86,11 @@ impl TraditionalMixerEmlator {
             context.add_video_input(id.clone()).await.unwrap();
         }
 
-        let active_output_stream = context.add_video_output().await;
-        self.active_output_stream
+        let active_video_output = context.add_video_output().await;
+        self.active_video_output
             .lock()
             .await
-            .replace(active_output_stream);
+            .replace(active_video_output);
 
         self.context.lock().await.replace(context);
 
@@ -160,7 +160,7 @@ impl Node for TraditionalMixerEmlator {
         };
 
         let frame_context = frame_context.submit().await;
-        self.active_output_stream
+        self.active_video_output
             .lock()
             .await
             .as_mut()

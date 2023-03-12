@@ -8,9 +8,9 @@ use crate::{
     colour::ColourSpace,
     compute::{
         audio_frame::{AudioFrame, AudioFrameId},
-        audio_stream::{AudioOutput, AudioPipe},
+        audio_output::{AudioOutput, AudioPipe},
         video_frame::VideoFrame,
-        video_stream::{VideoOutput, VideoPipe},
+        video_output::{VideoOutput, VideoPipe},
         PhaneronComputeContext,
     },
     format::VideoFormat,
@@ -165,30 +165,30 @@ impl NodeContext {
 
     #[deprecated]
     pub async fn get_available_audio_outputs(&self) -> Vec<AudioOutputId> {
-        let audio_streams = self.inner.audio_outputs.lock().await;
+        let audio_outputs = self.inner.audio_outputs.lock().await;
 
-        audio_streams.keys().cloned().collect()
+        audio_outputs.keys().cloned().collect()
     }
 
     #[deprecated]
     pub async fn get_available_video_outputs(&self) -> Vec<VideoOutputId> {
-        let video_streams = self.inner.video_outputs.lock().await;
+        let video_outputs = self.inner.video_outputs.lock().await;
 
-        video_streams.keys().cloned().collect()
+        video_outputs.keys().cloned().collect()
     }
 
-    pub async fn get_audio_pipe(&self, audio_stream_id: &AudioOutputId) -> AudioPipe {
-        let audio_streams = self.inner.audio_outputs.lock().await;
-        let audio_stream = audio_streams.get(audio_stream_id).unwrap();
+    pub async fn get_audio_pipe(&self, audio_output_id: &AudioOutputId) -> AudioPipe {
+        let audio_outputs = self.inner.audio_outputs.lock().await;
+        let audio_output = audio_outputs.get(audio_output_id).unwrap();
 
-        AudioPipe::new(audio_stream_id.clone(), audio_stream.subscribe().await)
+        AudioPipe::new(audio_output_id.clone(), audio_output.subscribe().await)
     }
 
-    pub async fn get_video_pipe(&self, video_stream_id: &VideoOutputId) -> VideoPipe {
-        let video_streams = self.inner.video_outputs.lock().await;
-        let video_stream = video_streams.get(video_stream_id).unwrap();
+    pub async fn get_video_pipe(&self, video_output_id: &VideoOutputId) -> VideoPipe {
+        let video_outputs = self.inner.video_outputs.lock().await;
+        let video_output = video_outputs.get(video_output_id).unwrap();
 
-        VideoPipe::new(video_stream_id.clone(), video_stream.subscribe().await)
+        VideoPipe::new(video_output_id.clone(), video_output.subscribe().await)
     }
 
     pub async fn connect_video_pipe(
@@ -539,15 +539,15 @@ pub async fn run_node(
             continue;
         }
 
-        let mut no_streams = false;
+        let mut no_connections = false;
         {
-            let streams_lock = run_node_context.video_outputs.lock().await;
-            for stream in streams_lock.iter() {
-                no_streams |= stream.1.no_receivers().await;
+            let outputs_lock = run_node_context.video_outputs.lock().await;
+            for output in outputs_lock.iter() {
+                no_connections |= output.1.no_receivers().await;
             }
         }
 
-        if no_streams {
+        if no_connections {
             // No connections, can't make progress
             continue;
         }

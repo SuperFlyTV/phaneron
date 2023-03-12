@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 pub use crate::api::initialize_api;
-pub use crate::compute::{audio_stream::AudioPipe, create_compute_context};
+pub use crate::compute::{audio_output::AudioPipe, create_compute_context};
 pub use crate::graph::{AudioInputId, GraphId, NodeId, VideoInputId};
 pub use crate::node_context::NodeContext;
 pub use plugins::ffmpeg_producer::FFmpegProducerPlugin;

@@ -13,9 +13,9 @@ use tracing::info;
 use tracing::log::debug;
 
 use crate::compute::audio_frame::{AudioFrame, AudioFrameId};
-use crate::compute::audio_stream::AudioOutput;
+use crate::compute::audio_output::AudioOutput;
 use crate::compute::video_frame::VideoFrame;
-use crate::compute::video_stream::VideoOutput;
+use crate::compute::video_output::VideoOutput;
 use crate::format::VideoFormat;
 use crate::graph::{AudioInputId, AudioOutputId, VideoOutputId};
 use crate::io::ToRGBA;
@@ -259,13 +259,13 @@ impl FFmpegProducer {
             vec![];
 
         for receiver in loaded_video_frame_receivers {
-            let video_stream = context.add_video_output().await;
-            video_processes.push((Mutex::new(receiver), video_stream));
+            let video_output = context.add_video_output().await;
+            video_processes.push((Mutex::new(receiver), video_output));
         }
 
         for receiver in loaded_audio_frame_receivers {
-            let audio_stream = context.add_audio_output().await;
-            audio_processes.push((Mutex::new(receiver), audio_stream));
+            let audio_output = context.add_audio_output().await;
+            audio_processes.push((Mutex::new(receiver), audio_output));
         }
 
         debug!(
@@ -301,17 +301,17 @@ impl Node for FFmpegProducer {
 
         let video_processes_lock = self.video_processes.lock().await;
         if let Some(video_processes) = &*video_processes_lock {
-            for (video_receiver, video_stream) in video_processes.iter() {
+            for (video_receiver, video_output) in video_processes.iter() {
                 let frame = video_receiver.lock().unwrap().recv().unwrap();
-                video_stream.push_frame(&frame_context, frame).await;
+                video_output.push_frame(&frame_context, frame).await;
             }
         }
 
         let audio_processes_lock = self.audio_processes.lock().await;
         if let Some(audio_processes) = &*audio_processes_lock {
-            for (audio_receiver, audio_stream) in audio_processes.iter() {
+            for (audio_receiver, audio_output) in audio_processes.iter() {
                 let frame = audio_receiver.lock().unwrap().recv().unwrap();
-                audio_stream.push_frame(&frame_context, frame).await;
+                audio_output.push_frame(&frame_context, frame).await;
             }
         }
     }

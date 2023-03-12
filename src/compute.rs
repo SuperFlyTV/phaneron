@@ -9,9 +9,9 @@ use tracing::debug;
 use self::video_frame::{VideoFrame, VideoFrameId};
 
 pub mod audio_frame;
-pub mod audio_stream;
+pub mod audio_output;
 pub mod video_frame;
-pub mod video_stream;
+pub mod video_output;
 
 #[cfg(Debug)]
 fn cl_queue_properties() -> opencl3::types::cl_command_queue_properties {

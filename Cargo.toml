@@ -1,5 +1,9 @@
 [package]
 name = "phaneron"
+license = "GPL-3.0"
+description = "A media compositing framework"
+homepage = "https://github.com/SuperFlyTV/phaneron"
+repository = "https://github.com/SuperFlyTV/phaneron"
 version = "0.1.0"
 edition = "2021"
 

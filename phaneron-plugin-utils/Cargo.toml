@@ -1,7 +1,9 @@
 [package]
 name = "phaneron-plugin-utils"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
+description = "Provides utilities that may be useful to plugns for Phaneron"
+license = "GPL-3.0-or-later"
 
 [dependencies]
-phaneron-plugin = { path = "../phaneron-plugin" }
+phaneron-plugin = { version = "0.1.2", path = "../phaneron-plugin" }

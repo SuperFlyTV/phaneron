@@ -1962,7 +1962,7 @@ dependencies = [
 
 [[package]]
 name = "phaneron-plugin-demo"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "abi_stable",
  "log",
@@ -1973,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "phaneron-plugin-ffmpeg"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "abi_stable",
  "anyhow",
@@ -1988,14 +1988,14 @@ dependencies = [
 
 [[package]]
 name = "phaneron-plugin-utils"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "phaneron-plugin",
 ]
 
 [[package]]
 name = "phaneron-plugin-webrtc"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "abi_stable",
  "axum",

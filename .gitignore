@@ -1,2 +1,4 @@
+/plugins
 /target
 video_inputs.json
+.env

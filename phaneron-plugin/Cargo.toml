@@ -1,9 +1,9 @@
 [package]
 name = "phaneron-plugin"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Interfaces for implementing Phaneron plugins in Rust"
-license = "GPL-3.0-or-later"
+license = "MIT"
 
 [dependencies]
 abi_stable = "0.11.1"

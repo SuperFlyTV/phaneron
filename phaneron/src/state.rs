@@ -37,7 +37,7 @@ use crate::{
     GraphId, NodeId,
 };
 
-// Representation of the state that is safe to expose to the outside world
+/// Representation of the state that is safe to expose to the outside world
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhaneronStateRepresentation {
     pub nodes: HashMap<String, PhaneronNodeRepresentation>,

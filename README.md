@@ -29,7 +29,7 @@ Some plugins may not be supported on all platforms. Currently opting out of buil
 ## Adding a new Plugin
 1. Add an entry to both `members` and `default-members` in `Cargo.toml` for the new plugin.
 2. Add an entry to `plugins.toml` for you plugin (this should match the value in `package.name` in the `Cargo.toml` file for your plugin).
-3. Run `cargo new --lib phaneron-pluing-my-plugin-name`.
+3. Run `cargo new --lib phaneron-plugin-my-plugin-name`.
 4. Refer to existing plugins for example code.
 
 ## Developer Requirements

@@ -22,7 +22,9 @@ pub use crate::api::initialize_api;
 pub use crate::compute::{audio_output::AudioPipe, create_compute_context};
 pub use crate::graph::{GraphId, NodeId};
 pub use crate::node_context::NodeRunContext;
-pub use plugins::{DevPluginManifest, PluginLoadType, PluginManager};
+pub use plugins::{
+    cl_shader_plugin::ClShaderPlugin, DevPluginManifest, PluginLoadType, PluginManager,
+};
 pub use state::{
     create_phaneron_state, CreateConnection, CreateConnectionType, CreateNode, PhaneronState,
 };

@@ -172,20 +172,29 @@ async fn main() {
             ),
         },
         CreateNode {
-            node_id: "flip_test".to_string(),
+            node_id: "flipper".to_string(),
             node_type: "flip".to_string(),
             node_name: Some("flip".to_string()),
             state: None,
             configuration: None,
         },
     ];
-    let mut connections = vec![CreateConnection {
-        connection_type: CreateConnectionType::Video,
-        from_node_id: "switcher".to_string(),
-        from_output_index: 0,
-        to_node_id: "active_input_webrtc_consumer".to_string(),
-        to_input_index: 0,
-    }];
+    let mut connections = vec![
+        CreateConnection {
+            connection_type: CreateConnectionType::Video,
+            from_node_id: "switcher".to_string(),
+            from_output_index: 0,
+            to_node_id: "flipper".to_string(),
+            to_input_index: 0,
+        },
+        CreateConnection {
+            connection_type: CreateConnectionType::Video,
+            from_node_id: "flipper".to_string(),
+            from_output_index: 0,
+            to_node_id: "active_input_webrtc_consumer".to_string(),
+            to_input_index: 0,
+        },
+    ];
     for (index, input) in video_inputs.videos.iter().enumerate() {
         let ffmpeg_producer_id = phaneron::NodeId::default();
         create_nodes.push(CreateNode {

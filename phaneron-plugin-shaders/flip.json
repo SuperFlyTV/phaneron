@@ -3,12 +3,24 @@
     "programName": "flip",
     "args": [
         {
-            "displayName": "Input",
-            "type": "videoInput"
+            "type": "videoInput",
+            "displayName": "Input"
         },
         {
-            "displayName": "Output",
-            "type": "videoOutput"
+            "type": "bool",
+            "key": "flipHorizontal",
+            "displayName": "Flip Horizontal",
+            "defaultVal": false
+        },
+        {
+            "type": "bool",
+            "key": "flipVertical",
+            "displayName": "Flip Vertical",
+            "defaultVal": false
+        },
+        {
+            "type": "videoOutput",
+            "displayName": "Output"
         }
     ]
 }

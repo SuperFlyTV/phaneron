@@ -23,13 +23,24 @@ __constant sampler_t sampler1 =
 
 __kernel void flip(
     __read_only image2d_t input,
-    // __private char flip_vertical,
-    // __private char flip_horizontal,
+    __private char flip_horizontal,
+    __private char flip_vertical,
     __write_only image2d_t output
 ) {
-    int x = get_global_id(0);
-    int y = get_global_id(1);
+    int w = get_image_width(input);
+    int h = get_image_height(input);
 
-    float4 out = read_imagef(input, sampler1, (int2)(x,y));
+    int x = get_global_id(0);
+    int sample_x = get_global_id(0);
+    if (flip_horizontal > 0) {
+        sample_x = w - x - 1;
+    }
+    int y = get_global_id(1);
+    int sample_y = get_global_id(1);
+    if (flip_vertical > 0) {
+        sample_y = h - y - 1;
+    }
+
+    float4 out = read_imagef(input, sampler1, (int2)(sample_x, sample_y));
     write_imagef(output, (int2)(x, y), out);
 }

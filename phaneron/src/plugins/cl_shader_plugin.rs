@@ -90,6 +90,13 @@ enum ShaderArg {
         #[serde(rename = "defaultVal")]
         default_val: u32,
     },
+    Bool {
+        key: String,
+        #[serde(rename = "displayName")]
+        display_name: String,
+        #[serde(rename = "defaultVal")]
+        default_val: bool,
+    },
 }
 
 fn load_shader(
@@ -199,6 +206,10 @@ enum ShaderRunArg {
         inclusive_maximum: u32,
         default_val: u32,
     },
+    Bool {
+        key: String,
+        default_val: bool,
+    },
 }
 
 struct ShaderNode {
@@ -244,12 +255,18 @@ impl ShaderNode {
                     inclusive_minimum,
                     inclusive_maximum,
                 }),
+                ShaderArg::Bool {
+                    key,
+                    display_name: _,
+                    default_val,
+                } => run_args.push(ShaderRunArg::Bool { key, default_val }),
             }
         }
 
         let mut state = anymap::Map::new();
         state.insert::<HashMap<String, f32>>(HashMap::new());
         state.insert::<HashMap<String, u32>>(HashMap::new());
+        state.insert::<HashMap<String, bool>>(HashMap::new());
 
         let state = Mutex::new(state);
 
@@ -296,6 +313,16 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                         f32_map.insert(key.clone(), val.as_u64().unwrap() as u32);
                     } else {
                         f32_map.insert(key.clone(), *default_val);
+                    }
+                }
+                ShaderRunArg::Bool { key, default_val } => {
+                    let val = &json[key];
+                    let mut state_lock = self.state.lock().unwrap();
+                    let bool_map = state_lock.get_mut::<HashMap<String, bool>>().unwrap();
+                    if let serde_json::Value::Bool(val) = val {
+                        bool_map.insert(key.clone(), *val);
+                    } else {
+                        bool_map.insert(key.clone(), *default_val);
                     }
                 }
                 _ => {}
@@ -349,6 +376,11 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                     let state_lock = self.state.lock().unwrap();
                     let u32_map = state_lock.get::<HashMap<String, u32>>().unwrap();
                     params.set_param_u32_input(*u32_map.get(key).unwrap_or(default_val))
+                }
+                ShaderRunArg::Bool { key, default_val } => {
+                    let state_lock = self.state.lock().unwrap();
+                    let bool_map = state_lock.get::<HashMap<String, bool>>().unwrap();
+                    params.set_param_bool_input(*bool_map.get(key).unwrap_or(default_val))
                 }
             }
         }

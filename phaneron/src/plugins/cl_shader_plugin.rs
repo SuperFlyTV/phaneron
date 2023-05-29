@@ -6,10 +6,9 @@ use std::{
 };
 
 use abi_stable::{sabi_trait::TD_Opaque, std_types::RResult::ROk};
-use anymap::AnyMap;
 use phaneron_plugin::{
-    traits::{Node, NodeHandle_TO, Node_TO},
-    ShaderParams, VideoInputId, VideoOutputId,
+    traits::{NodeHandle_TO, Node_TO},
+    ShaderParams, VideoInputId,
 };
 use serde::Deserialize;
 use tracing::info;
@@ -207,7 +206,7 @@ struct ShaderNode {
     context: phaneron_plugin::types::NodeContext,
     run_args: Vec<ShaderRunArg>,
     shader: Arc<phaneron_plugin::types::ProcessShader>,
-    state: anymap::Map<dyn anymap::any::Any + Send + Sync>,
+    state: Mutex<anymap::Map<dyn anymap::any::Any + Send + Sync>>,
 }
 
 impl ShaderNode {
@@ -252,6 +251,8 @@ impl ShaderNode {
         state.insert::<HashMap<String, f32>>(HashMap::new());
         state.insert::<HashMap<String, u32>>(HashMap::new());
 
+        let state = Mutex::new(state);
+
         Self {
             id,
             run_args,
@@ -264,7 +265,44 @@ impl ShaderNode {
 
 impl phaneron_plugin::traits::Node for ShaderNode {
     fn apply_state(&self, state: abi_stable::std_types::RString) -> bool {
-        false
+        let json: serde_json::Value = serde_json::from_str(&state.to_string()).unwrap();
+
+        for arg in self.run_args.iter() {
+            match arg {
+                ShaderRunArg::F32 { key, default_val } => {
+                    // TODO: Validation
+                    let val = &json[key];
+                    let mut state_lock = self.state.lock().unwrap();
+                    let f32_map = state_lock.get_mut::<HashMap<String, f32>>().unwrap();
+                    if let serde_json::Value::Number(val) = val {
+                        // TODO: Could panic
+                        f32_map.insert(key.clone(), val.as_f64().unwrap() as f32);
+                    } else {
+                        f32_map.insert(key.clone(), *default_val);
+                    }
+                }
+                ShaderRunArg::U32 {
+                    key,
+                    inclusive_minimum,
+                    inclusive_maximum,
+                    default_val,
+                } => {
+                    // TODO: Validation
+                    let val = &json[key];
+                    let mut state_lock = self.state.lock().unwrap();
+                    let f32_map = state_lock.get_mut::<HashMap<String, u32>>().unwrap();
+                    if let serde_json::Value::Number(val) = val {
+                        // TODO: Could panic
+                        f32_map.insert(key.clone(), val.as_u64().unwrap() as u32);
+                    } else {
+                        f32_map.insert(key.clone(), *default_val);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        true
     }
 
     fn process_frame(
@@ -298,7 +336,8 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                     params.set_param_video_frame_output(1920, 1080) // TODO: Hard-coded dimensions
                 }
                 ShaderRunArg::F32 { key, default_val } => {
-                    let f32_map = self.state.get::<HashMap<String, f32>>().unwrap();
+                    let state_lock = self.state.lock().unwrap();
+                    let f32_map = state_lock.get::<HashMap<String, f32>>().unwrap();
                     params.set_param_f32_input(*f32_map.get(key).unwrap_or(default_val))
                 }
                 ShaderRunArg::U32 {
@@ -307,7 +346,8 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                     inclusive_maximum: _,
                     default_val,
                 } => {
-                    let u32_map = self.state.get::<HashMap<String, u32>>().unwrap();
+                    let state_lock = self.state.lock().unwrap();
+                    let u32_map = state_lock.get::<HashMap<String, u32>>().unwrap();
                     params.set_param_u32_input(*u32_map.get(key).unwrap_or(default_val))
                 }
             }
@@ -323,6 +363,7 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                 .filter(|arg| matches!(arg, ShaderRunArg::VideoOutput { output: _ }))
                 .nth(index)
                 .unwrap();
+            // TODO: Messy
             match video_output {
                 ShaderRunArg::VideoOutput { output } => {
                     output.push_frame(&frame_context, output_frame)

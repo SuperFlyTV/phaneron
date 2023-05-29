@@ -1,0 +1,6 @@
+[book]
+authors = ["sbaud"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Phaneron"

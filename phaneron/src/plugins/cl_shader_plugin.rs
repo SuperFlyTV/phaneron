@@ -37,8 +37,9 @@ impl ClShaderPlugin {
                 if metadata.is_file()
                     && path.path().extension().and_then(OsStr::to_str).unwrap() == "cl"
                 {
+                    println!("Loading {}", path.file_name().to_str().unwrap());
                     let shader = load_shader(context, path).unwrap();
-                    println!("Loading {}", shader.0);
+                    println!("Loaded {}", shader.0);
                     self.plugins.insert(shader.0, shader.1);
                     loaded_plugins += 1;
                 }
@@ -86,7 +87,7 @@ enum ShaderArg {
         #[serde(rename = "inclusiveMinimum")]
         inclusive_minimum: u32,
         #[serde(rename = "inclusiveMaximum")]
-        inclusive_maximum: u32,
+        inclusive_maximum: Option<u32>,
         #[serde(rename = "defaultVal")]
         default_val: u32,
     },
@@ -97,6 +98,67 @@ enum ShaderArg {
         #[serde(rename = "defaultVal")]
         default_val: bool,
     },
+}
+
+impl ShaderArg {
+    fn is_valid_arg(&self) -> bool {
+        match self {
+            ShaderArg::VideoInput { display_name } => !display_name.is_empty(),
+            ShaderArg::VideoOutput { display_name } => !display_name.is_empty(),
+            ShaderArg::F32 {
+                key,
+                display_name,
+                default_val,
+            } => {
+                !key.is_empty()
+                    && !display_name.is_empty()
+                    && *default_val >= 0.0f32
+                    && *default_val <= 1.0f32
+            }
+            ShaderArg::U32 {
+                key,
+                display_name,
+                inclusive_minimum,
+                inclusive_maximum,
+                default_val,
+            } => {
+                !key.is_empty()
+                    && !display_name.is_empty()
+                    && inclusive_maximum.unwrap_or(u32::MAX) > *inclusive_minimum
+                    && default_val >= inclusive_minimum
+                    && *default_val <= inclusive_maximum.unwrap_or(u32::MAX)
+            }
+            ShaderArg::Bool {
+                key,
+                display_name,
+                default_val: _,
+            } => !key.is_empty() && !display_name.is_empty(),
+        }
+    }
+
+    fn arg_display_name(&self) -> String {
+        match self {
+            ShaderArg::VideoInput { display_name } => display_name.clone(),
+            ShaderArg::VideoOutput { display_name } => display_name.clone(),
+            ShaderArg::F32 {
+                key: _,
+                display_name,
+                default_val: _,
+            } => display_name.clone(),
+            ShaderArg::U32 {
+                key: _,
+                display_name,
+                inclusive_minimum: _,
+                inclusive_maximum: _,
+                default_val: _,
+            } => display_name.clone(),
+            ShaderArg::Bool {
+                key: _,
+                display_name,
+                default_val: _,
+            } => display_name.clone(),
+        }
+    }
 }
 
 fn load_shader(
@@ -112,6 +174,25 @@ fn load_shader(
     let id = path.path();
     let id = id.file_stem().unwrap();
     let id = id.to_str().unwrap();
+
+    if shader_description
+        .args
+        .iter()
+        .filter(|arg| matches!(arg, ShaderArg::VideoOutput { display_name: _ }))
+        .count()
+        == 0
+    {
+        return Err(anyhow::anyhow!("Shader does not have any outputs"));
+    }
+
+    for arg in shader_description.args.iter() {
+        if !arg.is_valid_arg() {
+            return Err(anyhow::anyhow!(
+                "Shader has invalid arg {}",
+                arg.arg_display_name()
+            ));
+        }
+    }
 
     let process_shader = context.create_process_shader(&shader, &shader_description.program_name);
     let shader = PluginProvidedShader {
@@ -253,7 +334,7 @@ impl ShaderNode {
                     key,
                     default_val,
                     inclusive_minimum,
-                    inclusive_maximum,
+                    inclusive_maximum: inclusive_maximum.unwrap_or(u32::MAX),
                 }),
                 ShaderArg::Bool {
                     key,

@@ -41,6 +41,8 @@ use phaneron_plugin::{
 };
 use serde::{Deserialize, Serialize};
 
+pub(super) mod cl_shader_plugin;
+
 #[derive(Debug, Deserialize)]
 pub struct DevPluginManifest {
     plugins: Vec<String>,
@@ -59,7 +61,7 @@ pub enum PluginLoadType {
 }
 
 impl PluginManager {
-    pub fn initialize(&mut self, load_type: PluginLoadType) -> anyhow::Result<usize> {
+    pub fn load_from(&mut self, load_type: PluginLoadType) -> anyhow::Result<usize> {
         let (plugins_to_load, plugins_directory) = match load_type {
             PluginLoadType::Development(manifest) => (manifest.plugins, None),
             PluginLoadType::Production { plugins_directory } => {
@@ -85,6 +87,21 @@ impl PluginManager {
         }
 
         Ok(loaded_plugins)
+    }
+
+    pub fn add_plugin(&mut self, plugin: PhaneronPlugin) -> anyhow::Result<()> {
+        let nodes = plugin.get_available_node_types();
+
+        let plugin_id = PluginId::default();
+        for node_type in nodes {
+            self.nodes_provided_by_plugins
+                .insert(node_type.id.to_string(), plugin_id.clone());
+            self.node_descriptions
+                .insert(node_type.id.to_string(), node_type);
+        }
+        self.plugins.insert(plugin_id, plugin);
+
+        Ok(())
     }
 
     fn load_plugin(

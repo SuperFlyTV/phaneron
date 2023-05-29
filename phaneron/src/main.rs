@@ -16,12 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs;
+use std::{fs, path::Path};
 
+use abi_stable::sabi_trait::TD_Opaque;
 use phaneron::{
-    create_phaneron_state, CreateConnection, CreateConnectionType, CreateNode, DevPluginManifest,
-    NodeId, PluginLoadType, PluginManager,
+    create_phaneron_state, ClShaderPlugin, CreateConnection, CreateConnectionType, CreateNode,
+    DevPluginManifest, NodeId, PluginLoadType, PluginManager,
 };
+use phaneron_plugin::traits::PhaneronPlugin_TO;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use tracing_subscriber::{prelude::*, EnvFilter};
@@ -105,6 +107,12 @@ async fn main() {
         }
     };
 
+    let shader_plugins_directory =
+        std::env::var("SHADER_PLUGINS_DIR").unwrap_or_else(|_| match &plugin_load_type {
+            PluginLoadType::Development(_) => "phaneron-plugin-shaders".to_string(),
+            PluginLoadType::Production { plugins_directory } => plugins_directory.clone(),
+        });
+
     let stdout_log = tracing_subscriber::fmt::layer().compact();
     let env_filter = EnvFilter::from_default_env();
     tracing_subscriber::registry()
@@ -122,8 +130,18 @@ async fn main() {
 
     info!("Loading plugins");
     let mut plugin_manager = PluginManager::default();
-    let loaded_plugins = plugin_manager.initialize(plugin_load_type).unwrap();
-    info!("Loaded {} plugins", loaded_plugins);
+    let loaded_plugins = plugin_manager.load_from(plugin_load_type).unwrap();
+    info!(
+        "Loaded {} plugin{}",
+        loaded_plugins,
+        if loaded_plugins != 1 { "s" } else { "" }
+    );
+
+    let mut shader_plugin = ClShaderPlugin::default();
+    shader_plugin.load_from(&context, Path::new(&shader_plugins_directory).into());
+    plugin_manager
+        .add_plugin(PhaneronPlugin_TO::from_value(shader_plugin, TD_Opaque))
+        .unwrap();
 
     let graph_id = phaneron::GraphId::new_from("graph1".to_string());
     let mut create_nodes = vec![
@@ -153,14 +171,30 @@ async fn main() {
                 .unwrap(),
             ),
         },
+        CreateNode {
+            node_id: "flipper".to_string(),
+            node_type: "flip".to_string(),
+            node_name: Some("flip".to_string()),
+            state: None,
+            configuration: None,
+        },
     ];
-    let mut connections = vec![CreateConnection {
-        connection_type: CreateConnectionType::Video,
-        from_node_id: "switcher".to_string(),
-        from_output_index: 0,
-        to_node_id: "active_input_webrtc_consumer".to_string(),
-        to_input_index: 0,
-    }];
+    let mut connections = vec![
+        CreateConnection {
+            connection_type: CreateConnectionType::Video,
+            from_node_id: "switcher".to_string(),
+            from_output_index: 0,
+            to_node_id: "flipper".to_string(),
+            to_input_index: 0,
+        },
+        CreateConnection {
+            connection_type: CreateConnectionType::Video,
+            from_node_id: "flipper".to_string(),
+            from_output_index: 0,
+            to_node_id: "active_input_webrtc_consumer".to_string(),
+            to_input_index: 0,
+        },
+    ];
     for (index, input) in video_inputs.videos.iter().enumerate() {
         let ffmpeg_producer_id = phaneron::NodeId::default();
         create_nodes.push(CreateNode {

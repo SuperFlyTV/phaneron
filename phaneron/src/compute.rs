@@ -477,6 +477,17 @@ impl phaneron_plugin::traits::ProcessShader for ProcessShaderImpl {
                 ShaderParam::F32Input(val) => {
                     unsafe { execute_kernel.set_arg(val) };
                 }
+                ShaderParam::Bool(val) => {
+                    if *val {
+                        unsafe {
+                            execute_kernel.set_arg(&1_u8);
+                        }
+                    } else {
+                        unsafe {
+                            execute_kernel.set_arg(&0_u8);
+                        }
+                    }
+                }
                 ShaderParam::VideoFrameOutput { width, height } => {
                     let image_ref = self.context.create_image(*width, *height);
                     let image_index = image_ref.video_buffer_index;

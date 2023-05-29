@@ -1,0 +1,26 @@
+{
+    "name": "Image Flip",
+    "programName": "flip",
+    "args": [
+        {
+            "type": "videoInput",
+            "displayName": "Input"
+        },
+        {
+            "type": "bool",
+            "key": "flipHorizontal",
+            "displayName": "Flip Horizontal",
+            "defaultVal": false
+        },
+        {
+            "type": "bool",
+            "key": "flipVertical",
+            "displayName": "Flip Vertical",
+            "defaultVal": false
+        },
+        {
+            "type": "videoOutput",
+            "displayName": "Output"
+        }
+    ]
+}

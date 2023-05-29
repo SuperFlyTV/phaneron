@@ -210,6 +210,10 @@ impl ShaderParams {
         self.params.push(ShaderParam::F32Input(val));
     }
 
+    pub fn set_param_bool_input(&mut self, val: bool) {
+        self.params.push(ShaderParam::Bool(val));
+    }
+
     /// Sets a video frame as an output of a shader.
     pub fn set_param_video_frame_output(&mut self, width: usize, height: usize) {
         self.params
@@ -228,6 +232,7 @@ pub enum ShaderParam {
     VideoFrameInput(types::VideoFrame),
     U32Input(u32),
     F32Input(f32),
+    Bool(bool),
     VideoFrameOutput { width: usize, height: usize },
 }
 

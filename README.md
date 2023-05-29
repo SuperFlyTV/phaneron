@@ -8,6 +8,8 @@
 
 Note: Phaneron will attempt to bind to both port 8080 and 9091. This will be configurable in the future and will be reduced to a single port.
 
+More documentation is available in the book, which can be built from [phaneron-book](./phaneron-book) using [mdBook](https://rust-lang.github.io/mdBook/index.html).
+
 ## Configuration
 - Set the `DEVELOP_PLUGINS` environment variable to load plugins from the `target/` directory. This allows you to edit plugins and run Phaneron without having to separately build each plugin and copy it to the plugins folder.
 - If `DEVELOP_PLUGINS` is set, `PLUGINS_CFG_FILE` can be used to point to a different `plugins.toml` file.

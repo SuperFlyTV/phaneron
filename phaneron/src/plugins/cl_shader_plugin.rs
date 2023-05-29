@@ -293,7 +293,15 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                     let f32_map = state_lock.get_mut::<HashMap<String, f32>>().unwrap();
                     if let serde_json::Value::Number(val) = val {
                         // TODO: Could panic
-                        f32_map.insert(key.clone(), val.as_f64().unwrap() as f32);
+                        let mut val = val.as_f64().unwrap() as f32;
+                        if val < 0.0 {
+                            val = 0.0;
+                        }
+
+                        if val > 1.0 {
+                            val = 1.0;
+                        }
+                        f32_map.insert(key.clone(), val);
                     } else {
                         f32_map.insert(key.clone(), *default_val);
                     }
@@ -304,13 +312,19 @@ impl phaneron_plugin::traits::Node for ShaderNode {
                     inclusive_maximum,
                     default_val,
                 } => {
-                    // TODO: Validation
                     let val = &json[key];
                     let mut state_lock = self.state.lock().unwrap();
                     let f32_map = state_lock.get_mut::<HashMap<String, u32>>().unwrap();
                     if let serde_json::Value::Number(val) = val {
                         // TODO: Could panic
-                        f32_map.insert(key.clone(), val.as_u64().unwrap() as u32);
+                        let mut val = val.as_u64().unwrap() as u32;
+                        if val < *inclusive_minimum {
+                            val = *inclusive_minimum;
+                        }
+                        if val > *inclusive_maximum {
+                            val = *inclusive_maximum;
+                        }
+                        f32_map.insert(key.clone(), val);
                     } else {
                         f32_map.insert(key.clone(), *default_val);
                     }
@@ -339,12 +353,12 @@ impl phaneron_plugin::traits::Node for ShaderNode {
             phaneron_plugin::VideoInputId,
             phaneron_plugin::VideoFrameWithId,
         >,
-        audio_frames: abi_stable::std_types::RHashMap<
+        _audio_frames: abi_stable::std_types::RHashMap<
             phaneron_plugin::AudioInputId,
             phaneron_plugin::AudioFrameWithId,
         >,
         black_frame: phaneron_plugin::VideoFrameWithId,
-        silence_frame: phaneron_plugin::AudioFrameWithId,
+        _silence_frame: phaneron_plugin::AudioFrameWithId,
     ) {
         let mut params = ShaderParams::default();
 

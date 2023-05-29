@@ -1,0 +1,14 @@
+{
+    "name": "Image Flip",
+    "programName": "flip",
+    "args": [
+        {
+            "displayName": "Input",
+            "type": "videoInput"
+        },
+        {
+            "displayName": "Output",
+            "type": "videoOutput"
+        }
+    ]
+}

@@ -131,7 +131,11 @@ async fn main() {
     info!("Loading plugins");
     let mut plugin_manager = PluginManager::default();
     let loaded_plugins = plugin_manager.load_from(plugin_load_type).unwrap();
-    info!("Loaded {} plugins", loaded_plugins);
+    info!(
+        "Loaded {} plugin{}",
+        loaded_plugins,
+        if loaded_plugins != 1 { "s" } else { "" }
+    );
 
     let mut shader_plugin = ClShaderPlugin::default();
     shader_plugin.load_from(&context, Path::new(&shader_plugins_directory).into());
@@ -166,6 +170,13 @@ async fn main() {
                 })
                 .unwrap(),
             ),
+        },
+        CreateNode {
+            node_id: "flip_test".to_string(),
+            node_type: "flip".to_string(),
+            node_name: Some("flip".to_string()),
+            state: None,
+            configuration: None,
         },
     ];
     let mut connections = vec![CreateConnection {

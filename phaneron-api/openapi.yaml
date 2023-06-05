@@ -1,0 +1,40 @@
+openapi: '3.0.3'
+info: 
+  title: 'Phaneron HTTP API'
+  version: '1.0.0'
+  license:
+    name: 'MIT'
+    url: 'http://opensource.org/licenses/MIT'
+paths:
+  /:
+    $ref: 'openapi/phaneron.yaml#/resources/index'
+  /state:
+    $ref: 'openapi/phaneron.yaml#/resources/state'
+  /ws/{userId}/connection:
+    $ref: 'openapi/phaneron.yaml#/resources/register'
+  /ws/{userId}/connection/{clientId}:
+    $ref: 'openapi/phaneron.yaml#/resources/unregister'
+  /ws/{clientId}:
+    $ref: 'openapi/phaneron.yaml#/resources/ws'
+  /plugins:
+    $ref: 'openapi/plugins.yaml#/resources/plugins'
+  /plugins/{pluginId}/nodes:
+    $ref: 'openapi/plugins.yaml#/resources/pluginNodes'
+  /plugins/{pluginId}/nodes/{nodeId}/state-schema:
+    $ref: 'openapi/plugins.yaml#/resources/pluginNodeStateSchema'
+  /graphs:
+    $ref: 'openapi/graphs.yaml#/resources/graphs'
+  /graphs/{graphId}:
+    $ref: 'openapi/graphs.yaml#/resources/graph'
+  /graphs/{graphId}/nodes:
+    $ref: 'openapi/graphs.yaml#/resources/graphNodes'
+  /graphs/{graphId}/nodes/{nodeId}:
+    $ref: 'openapi/graphs.yaml#/resources/graphNode'
+  /graphs/{graphId}/nodes/{nodeId}/state:
+    $ref: 'openapi/graphs.yaml#/resources/graphNodeState'
+  /graphs/{graphId}/nodes/{nodeId}/inputs:
+    $ref: 'openapi/graphs.yaml#/resources/graphNodeInputs'
+  /graphs/{graphId}/nodes/{nodeId}/inputs/{inputId}:
+    $ref: 'openapi/graphs.yaml#/resources/graphNodeConnections'
+  /graphs/{graphId}/nodes/{nodeId}/outputs:
+    $ref: 'openapi/graphs.yaml#/resources/graphNodeOutputs'

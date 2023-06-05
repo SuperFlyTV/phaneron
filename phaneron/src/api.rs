@@ -16,11 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::state::{PhaneronState, PhaneronStateRepresentation};
 use axum::extract::ws::Message;
 use axum::extract::{State, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::Html;
-use axum::routing::post;
+use axum::routing::{delete, post};
 use axum::Json;
 use axum::{
     body::Bytes,
@@ -48,14 +49,16 @@ use tower_http::{
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{
-    api::message::RegisterResponse,
-    state::{PhaneronState, PhaneronStateRepresentation},
+use self::message::ServerEvent;
+use self::rest::request::{
+    AddGraphRequest, ConnectGraphNodeInputParams, ConnectGraphNodeInputRequest,
+    DisconnectGraphNodeInputParams, GetGraphNodeInputsParams, GetGraphNodeOutputsParams,
+    GetGraphNodeParams, GetGraphNodeStateParams, GetNodeStateSchemaParams, RegisterRequest,
 };
-
-use self::message::{RegisterRequest, ServerEvent};
+use self::rest::response::RegisterResponse;
 
 mod message;
+mod rest;
 mod ws;
 
 #[derive(Debug, Clone)]
@@ -161,11 +164,41 @@ fn app(state: AppState) -> Router {
 
     Router::new()
         .route("/", get(get_index))
+        .route("/state", get(get_state))
+        .route("/ws/:userId/connection", post(register_handler))
         .route(
-            "/register",
-            post(register_handler).delete(unregister_handler),
+            "/ws/:userId/connection/:clientId",
+            delete(unregister_handler),
         )
         .route("/ws/:clientId", get(state_ws))
+        .route("/plugins", get(get_plugins))
+        .route("/plugins/:pluginId/nodes", get(get_plugin_nodes))
+        .route(
+            "/plugins/:pluginId/nodes/:nodeId/state-schema",
+            get(get_node_state_schema),
+        )
+        .route("/graphs", get(get_graphs).post(add_graph))
+        .route("/graphs/:graphId", get(get_graph))
+        .route("/graphs/:graphId/nodes", get(get_graph_nodes))
+        .route("/graphs/:graphId/nodes/:nodeId", get(get_graph_node))
+        .route(
+            "/graphs/:graphId/nodes/:nodeId/state",
+            get(get_graph_node_state),
+        )
+        .route(
+            "/graphs/:graphId/nodes/:nodeId/inputs",
+            get(get_graph_node_inputs),
+        )
+        .route(
+            "/graphs/:graphId/nodes/:nodeId/inputs/:inputId",
+            get(get_graph_node_input_connections)
+                .put(connect_graph_node_input)
+                .delete(disconnect_graph_node_input),
+        )
+        .route(
+            "/graphs/:graphId/nodes/:nodeId/outputs",
+            get(get_graph_node_outputs),
+        )
         .layer(middleware)
         .layer(cors)
         .with_state(state)
@@ -177,10 +210,15 @@ async fn get_index() -> impl IntoResponse {
 }
 
 #[axum::debug_handler]
+async fn get_state(state: State<AppState>) -> impl IntoResponse {
+    unimplemented!()
+}
+
+#[axum::debug_handler]
 async fn register_handler(
     state: State<AppState>,
     Json(body): Json<RegisterRequest>,
-) -> impl IntoResponse {
+) -> Json<RegisterResponse> {
     info!("Register request: {:?}", body);
     let user_id = body.user_id;
     let uuid = Uuid::new_v4();
@@ -204,24 +242,25 @@ async fn register_client(id: Uuid, user_id: String, clients: Clients) {
 }
 
 #[axum::debug_handler]
-async fn unregister_handler(Path(id): Path<Uuid>, state: State<AppState>) -> impl IntoResponse {
+async fn unregister_handler(state: State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     state.clients.lock().await.remove(&id);
     StatusCode::OK
 }
 
+#[axum::debug_handler]
 async fn state_ws(
-    ws: WebSocketUpgrade,
-    Path(id): Path<Uuid>,
     state: State<AppState>,
+    ws: WebSocketUpgrade,
+    Path(client_id): Path<Uuid>,
 ) -> impl IntoResponse {
-    info!("Connection request with Id {}", id);
-    let client = state.clients.lock().await.get(&id).cloned();
+    info!("Connection request with Id {}", client_id);
+    let client = state.clients.lock().await.get(&client_id).cloned();
     match client {
         Some(c) => Ok(ws.on_upgrade(move |socket| {
             ws::client_connection(
                 state.context.clone(),
                 socket,
-                id,
+                client_id,
                 state.phaneron_state.clone(),
                 state.clients.clone(),
                 c,
@@ -229,4 +268,108 @@ async fn state_ws(
         })),
         None => Err("Client not found"),
     }
+}
+
+#[axum::debug_handler]
+async fn get_plugins(state: State<AppState>) -> impl IntoResponse {
+    unimplemented!()
+}
+
+#[axum::debug_handler]
+async fn get_plugin_nodes(
+    state: State<AppState>,
+    Path(plugin_id): Path<Uuid>,
+) -> impl IntoResponse {
+}
+
+#[axum::debug_handler]
+async fn get_node_state_schema(
+    state: State<AppState>,
+    Path(GetNodeStateSchemaParams { plugin_id, node_id }): Path<GetNodeStateSchemaParams>,
+) -> impl IntoResponse {
+}
+
+#[axum::debug_handler]
+async fn get_graphs(state: State<AppState>) -> impl IntoResponse {
+    unimplemented!()
+}
+
+#[axum::debug_handler]
+async fn add_graph(state: State<AppState>, Json(body): Json<AddGraphRequest>) -> impl IntoResponse {
+    unimplemented!()
+}
+
+#[axum::debug_handler]
+async fn get_graph(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {}
+
+#[axum::debug_handler]
+async fn get_graph_nodes(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {}
+
+#[axum::debug_handler]
+async fn get_graph_node(
+    state: State<AppState>,
+    Path(GetGraphNodeParams { graph_id, node_id }): Path<GetGraphNodeParams>,
+) -> impl IntoResponse {
+}
+
+#[axum::debug_handler]
+async fn get_graph_node_state(
+    state: State<AppState>,
+    Path(GetGraphNodeStateParams { graph_id, node_id }): Path<GetGraphNodeStateParams>,
+) -> impl IntoResponse {
+    unimplemented!()
+}
+
+#[axum::debug_handler]
+async fn get_graph_node_inputs(
+    state: State<AppState>,
+    Path(GetGraphNodeInputsParams {
+        graph_id,
+        node_id,
+        input_id,
+    }): Path<GetGraphNodeInputsParams>,
+) -> impl IntoResponse {
+    unimplemented!()
+}
+
+#[axum::debug_handler]
+async fn get_graph_node_input_connections(
+    state: State<AppState>,
+    Path(GetGraphNodeInputsParams {
+        graph_id,
+        node_id,
+        input_id,
+    }): Path<GetGraphNodeInputsParams>,
+) -> impl IntoResponse {
+    unimplemented!()
+}
+
+async fn connect_graph_node_input(
+    state: State<AppState>,
+    Path(ConnectGraphNodeInputParams {
+        graph_id,
+        node_id,
+        input_id,
+    }): Path<ConnectGraphNodeInputParams>,
+    Json(body): Json<ConnectGraphNodeInputRequest>,
+) -> impl IntoResponse {
+    unimplemented!()
+}
+
+async fn disconnect_graph_node_input(
+    state: State<AppState>,
+    Path(DisconnectGraphNodeInputParams {
+        graph_id,
+        node_id,
+        input_id,
+    }): Path<DisconnectGraphNodeInputParams>,
+) -> impl IntoResponse {
+    unimplemented!()
+}
+
+async fn get_graph_node_outputs(
+    state: State<AppState>,
+    Path(GetGraphNodeOutputsParams { graph_id, node_id }): Path<GetGraphNodeOutputsParams>,
+) -> impl IntoResponse {
+    unimplemented!()
 }

@@ -1,0 +1,527 @@
+resources:
+  graphs:
+    get:
+      operationId: getGraphs
+      tags:
+        - graphs
+      summary: Gets all of the Graphs in Phaneron.
+      responses:
+        200:
+          description: List of graphs returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  graphs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/phaneronGraph'
+                required:
+                  - graphs
+                additionalProperties: false
+    post:
+      operationId: addGraph
+      tags:
+        - graphs
+      summary: Adds a new Graph and returns its Id
+      requestBody:
+        required: true
+        description: Graph to add.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+              additionalProperties: false
+      responses:
+        200:
+          $ref: '#/components/responses/graphAdded'
+  graph:
+    get:
+      operationId: getGraph
+      tags:
+        - graphs
+      summary: Gets a Graph by Id.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Graph is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/phaneronGraph'
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/graphNotFound'
+  graphNodes:
+    get:
+      operationId: getGraphNodes
+      tags:
+        - graphs
+      summary: Gets the Nodes for a Graph.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Returns a list of Nodes for the given Graph.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/phaneronGraphNode'
+                required:
+                  - nodes
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/graphNotFound'
+  graphNode:
+    get:
+      operationId: getGraphNode
+      tags:
+        - graphs
+      summary: Gets a single Node.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Returns a representation of the Node.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/phaneronGraphNode'
+                required:
+                  - nodes
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+  graphNodeState:
+    get:
+      operationId: getNodeState
+      tags:
+        - graphs
+      summary: Gets the state of a Node.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Returns the state of a Node.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: string
+                required:
+                  - state
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+  graphNodeInputs:
+    get:
+      operationId: getNodeInputs
+      tags:
+        - graphs
+      summary: Gets the available inputs to a Node.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of available inputs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inputs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/nodeInput'
+                required:
+                  - inputs
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+  graphNodeConnections:
+    get:
+      operationId: getNodeInputConnections
+      tags:
+        - graphs
+      summary: Gets the state of an input to a Node.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: inputId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: State of the Node input is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/nodeInput'
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+                  - $ref: '#/components/schemas/inputNotFound'
+    put:
+      operationId: connectNodeInput
+      tags:
+        - graphs
+      summary: Connects an Output to the specified Input.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: inputId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectFromNodeId:
+                  type: string
+                  description: Id of the Node to make a connection from.
+                connectFromOutputId:
+                  type: string
+                  description: Id of the Output to connect to this Input.
+              required:
+                - connectFromNodeId
+                - connectFromOutputId
+              additionalProperties: false
+      responses:
+        200:
+          description: State of the Node input is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/nodeInput'
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+                  - $ref: '#/components/schemas/inputNotFound'
+    delete:
+      operationId: disconnectNodeInput
+      tags:
+        - graphs
+      summary: Disconnects the output connected to the specified input.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: inputId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: State of the Node input is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/nodeInput'
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+                  - $ref: '#/components/schemas/inputNotFound'
+  graphNodeOutputs:
+    get:
+      operationId: getNodeOutputs
+      tags:
+        - graphs
+      summary: Gets the available outputs from a Node.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Node outputs returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outputs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/nodeOutput'
+                required:
+                  - outputs
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/graphNodeNotFound'
+
+components:
+  schemas:
+    phaneronGraph:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+            required:
+              - id
+              - name
+            additionalProperties: false
+      required:
+        - id
+        - name
+        - nodes
+      additionalProperties: false
+    phaneronGraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        state:
+          type: string
+        audioInputs:
+          type: array
+          description: Array of input Ids.
+          items:
+            type: string
+        videoInputs:
+          type: array
+          description: Array of input Ids.
+          items:
+            type: string
+        audioOutputs:
+          type: array
+          description: Array of output Ids.
+          items:
+            type: string
+        videoOutputs:
+          type: array
+          description: Array of input Ids.
+          items:
+            type: string
+      required:
+        - id
+        - name
+        - state
+        - audioInputs
+        - videoInputs
+        - audioOutputs
+        - videoOutputs
+      additionalProperties: false
+    nodeInput:
+      type: object
+      properties:
+        id:
+          type: string
+        connectedOutputId:
+          type: string
+      required:
+        - id
+      additionalProperties: false
+    nodeOutput:
+      type: object
+      properties:
+        id:
+          type: string
+        connectedInputIds:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - connectedInputIds
+      additionalProperties: false
+    graphNotFound:
+      type: object
+      properties:
+        notFound:
+          type: string
+          const: graph
+        message:
+          type: string
+      required:
+        - notFound
+        - message
+      additionalProperties: false
+    graphNodeNotFound:
+      type: object
+      properties:
+        notFound:
+          type: string
+          const: graph
+        message:
+          type: string
+      required:
+        - notFound
+        - message
+      additionalProperties: false
+    inputNotFound:
+      type: object
+      properties:
+        notFound:
+          type: string
+          const: graph
+        message:
+          type: string
+      required:
+        - notFound
+        - message
+      additionalProperties: false
+  responses:
+    graphAdded:
+      description: A newly added Graph
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Id of the newly added Graph.
+            required:
+              - id
+            additionalProperties: false

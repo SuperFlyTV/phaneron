@@ -1,0 +1,172 @@
+title: Phaneron
+description: Definition for Phaneron routes.
+resources:
+  index:
+    get:
+      operationId: getPhaneronVersion
+      tags:
+        - phaneron
+      summary: Returns the current version of Phaneron, can be used to check that a Phaneron instance is available.
+      responses:
+        200:
+          description: Phaneron is alive, version is returned.
+          content:
+            text/plain:
+              schema:
+                type: string
+  state:
+    get:
+      operationId: getPhaneronState
+      tags:
+        - phaneron
+      summary: Gets the current state of Phaneron.
+      responses:
+        200:
+          description: State representation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    $ref: '#/components/schemas/nodeStatesMap'
+                  audioOutputs:
+                    $ref: '#/components/schemas/audioOutputsMap'
+                  audioInputs:
+                    $ref: '#/components/schemas/audioInputsMap'
+                  videoOutputs:
+                    $ref: '#/components/schemas/videoOutputsMap'
+                  videoInputs:
+                    $ref: '#/components/schemas/videoInputsMap'
+                  connections:
+                    type: object
+                    description: Map of input Id to output Id.
+                    additionalProperties:
+                      type: string
+                required:
+                  - nodes
+                  - audio_outputs
+                  - audio_inputs
+                  - video_outputs
+                  - video_inputs
+                  - connections
+                additionalProperties: false
+  register:
+    post:
+      operationId: registerConnectionForUser
+      tags:
+        - phaneron
+      summary: Creates a client connection for a given user Id.
+      parameters:
+        - name: userId
+          in: path
+          description: User Id to create a connection for.
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Provides the URL for the client to connect on.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    example:
+                      url: /ws/76f374d4-5f84-44cd-a972-c097f63571db
+                required:
+                  - url
+                additionalProperties: false
+  unregister:
+    delete:
+      operation: deleteConnectionForUser
+      tags:
+        - phaneron
+      sumamry: Removes a provided client connection.
+      parameters:
+        - name: userId
+          in: path
+          description: User Id the client connection belongs to.
+          required: true
+          schema:
+            type: string
+        - name: connectionId
+          in: path
+          description: The connection to remove.
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Connection was removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wasConnected:
+                    type: bool
+                required:
+                  - wasConnected
+                additionalProperties: false
+  ws:
+    get:
+      operationId: connectWebSocket
+      tags:
+        - phaneron
+      summary: Open a WebSocket connection.
+      parameters:
+        - name: clientId
+          in: path
+          description: Unique Id for the connecting client.
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Connection will be upgraded to websocket.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    nodeStatesMap:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          name:
+            type: string
+          state:
+            type: string
+        required:
+          - name
+          - state
+    audioOutputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    audioInputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    videoOutputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    videoInputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string

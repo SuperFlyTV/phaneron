@@ -1,0 +1,148 @@
+title: Phaneron Plugins
+description: Definition for Plugin routes.
+resources:
+  plugins:
+    get:
+      operationId: getAvailablePlugins
+      tags:
+        - plugins
+      summary: Returns the available Plugins.
+      responses:
+        200:
+          description: Returns a list of available Plugins.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plugins:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/pluginDescription'
+                required:
+                  - plugins
+                additionalProperties: false
+  pluginNodes:
+    get:
+      operationId: getAvailablePluginNodes
+      tags:
+        - plugins
+      summary: Returns the available Nodes for a given Plugin.
+      parameters:
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Returns a list of available Nodes for the Plugin.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/pluginNodeDescription'
+                required:
+                  - nodes
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pluginNotFound'
+  pluginNodeStateSchema:
+    get:
+      operationId: getNodeStateSchema
+      tags:
+        - plugins
+      summary: Returns the schema for the state of a Node.
+      parameters:
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Returns schema of Node state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema:
+                    type: object
+                    description: JSON schema for the node state.
+                required:
+                  - schema
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/pluginNotFound'
+                  - $ref: '#/components/schemas/nodeNotFound'
+
+components:
+  schemas:
+    pluginDescription:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/pluginNodeDescription'
+      required:
+        - id
+        - name
+        - nodes
+      additionalProperties: false
+    pluginNodeDescription:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The Id to use to create a Node of this type
+        name:
+          type: string
+          description: Display name for this Node type.
+      required:
+        - id
+        - name
+      additionalProperties: false
+    pluginNotFound:
+      description: The specified Plugin does not exist.
+      type: object
+      properties:
+        message:
+          type: string
+          example: Plugin 40570029-ab5e-4bab-b610-b0ede8dd4533 does not exist.
+      required:
+        - message
+      additionalProperties: false
+    nodeNotFound:
+      description: The specified Node does not exist.
+      type: object
+      properties:
+        message:
+          type: string
+          example: Node ed14b0f2-c26a-4923-a89a-b9edd2655836 does not exist.
+      required:
+        - message
+      additionalProperties: false

@@ -21,17 +21,6 @@ use serde::{Deserialize, Serialize};
 use crate::state::PhaneronStateRepresentation;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RegisterRequest {
-    #[serde(rename = "userId")]
-    pub user_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RegisterResponse {
-    pub url: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "event")]
 pub enum ClientEvent {

@@ -1,0 +1,141 @@
+asyncapi: '2.6.0'
+id: 'https://github.com/SuperFlyTV/phaneron'
+info:
+  title: Phaneron Websocket API
+  version: 1.0.0
+  description: Provides a service-to-service interface for Phaneron control and streaming state updates.
+  license:
+    name: MIT
+    url: https://opensource.org/license/mit/
+defaultContentType: application/json
+channels:
+  /:
+    subscribe:
+      operationId: phaneronWebsocketSubscribe
+      message:
+        oneOf:
+          - $ref: '#/components/messages/PhaneronState'
+    publish:
+      operationId: phaneronWebsocketPublish
+      message:
+        oneOf:
+          - $ref: '#/components/messages/SetNodeState'
+          - $ref: '#/components/messages/SetNodeStates'
+components:
+  messages:
+    PhaneronState:
+      messageId: phaneronState
+      payload:
+        type: object
+        properties:
+          nodes:
+            $ref: '#/components/schemas/nodeStatesMap'
+          audioOutputs:
+            $ref: '#/components/schemas/audioOutputsMap'
+          audioInputs:
+            $ref: '#/components/schemas/audioInputsMap'
+          videoOutputs:
+            $ref: '#/components/schemas/videoOutputsMap'
+          videoInputs:
+            $ref: '#/components/schemas/videoInputsMap'
+          connections:
+            type: object
+            description: Map of video inputs to video outputs
+            additionalProperties:
+              type: string
+        required:
+          - nodes
+          - audio_outputs
+          - audio_inputs
+          - video_outputs
+          - video_inputs
+          - connections
+        additionalProperties: false
+    SetNodeState:
+      messageId: setNodeState
+      description: Sets the state of an individual node.
+      payload:
+        type: object
+        properties:
+          event:
+            type: string
+            const: setNodeState
+          graphId:
+            type: string
+          nodeId:
+            type: string
+          state:
+            type: string
+        required:
+          - event
+          - graphId
+          - nodeId
+          - state
+        additionalProperties: false
+    SetNodeStates:
+      messageId: setNodeStates
+      description: Sets the state of multiple nodes, the states are guaranteed to be set on the same frame boundary. See the Phaneron book for details.
+      payload:
+        type: object
+        properties: 
+          event:
+            type: string
+            const: setNodeStates
+          graphId:
+            type: string
+          states:
+            type: array
+            items:
+              type: object
+              properties: 
+                nodeId:
+                  type: string
+                state:
+                  type: string
+              required:
+                - nodeId
+                - state
+              additionalProperties: false
+        required:
+          - event
+          - graphId
+          - states
+        additionalProperties: false
+
+  schemas:
+    nodeStatesMap:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          name:
+            type: string
+          state:
+            type: string
+        required:
+          - name
+          - state
+    audioOutputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    audioInputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    videoOutputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    videoInputsMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string

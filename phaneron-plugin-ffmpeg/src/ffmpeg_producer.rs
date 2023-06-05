@@ -118,7 +118,7 @@ impl phaneron_plugin::traits::Node for FFmpegProducer {
 
         // TODO: Flatten this out and make it more readable
         for stream in ictx.streams() {
-            let stream_type = stream.codec().medium();
+            let stream_type = stream.parameters().medium();
             match stream_type {
                 ffmpeg::media::Type::Video => {
                     let video_decoder_context =

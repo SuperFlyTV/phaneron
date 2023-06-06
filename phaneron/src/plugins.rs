@@ -40,6 +40,7 @@ use phaneron_plugin::{
     PhaneronPluginRootModuleRef,
 };
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 pub(super) mod cl_shader_plugin;
 
@@ -48,11 +49,24 @@ pub struct DevPluginManifest {
     plugins: Vec<String>,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct PhaneronPluginsState {
+    plugins_and_node_types: HashMap<PluginId, Vec<String>>,
+    node_descriptions: HashMap<String, PhaneronPluginNode>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PhaneronPluginNode {
+    id: String,
+    name: String,
+}
+
 #[derive(Default)]
 pub struct PluginManager {
     plugins: HashMap<PluginId, PhaneronPlugin>,
     nodes_provided_by_plugins: HashMap<String, PluginId>,
     node_descriptions: HashMap<String, PluginNodeDescription>,
+    subscribers_to_state: Mutex<Vec<tokio::sync::broadcast::Sender<PhaneronPluginsState>>>,
 }
 
 pub enum PluginLoadType {
@@ -173,6 +187,47 @@ impl PluginManager {
             None => RNone,
         };
         Some(node_handle.initialize(context, configuration))
+    }
+
+    pub async fn subscribe_to_plugins(
+        &self,
+    ) -> tokio::sync::broadcast::Receiver<PhaneronPluginsState> {
+        let (sender, receiver) = tokio::sync::broadcast::channel(1); // Only the latest value is relevant
+
+        {
+            let state = self.get_state().await;
+            sender.send(state).unwrap();
+        }
+        self.subscribers_to_state.lock().await.push(sender);
+
+        receiver
+    }
+
+    async fn get_state(&self) -> PhaneronPluginsState {
+        let mut plugins_and_node_types: HashMap<PluginId, Vec<String>> = HashMap::new();
+        for (node_id, plugin_id) in self.nodes_provided_by_plugins.iter() {
+            let entry = plugins_and_node_types.entry(plugin_id.clone()).or_default();
+            entry.push(node_id.clone());
+        }
+
+        let node_descriptions = self
+            .node_descriptions
+            .iter()
+            .map(|(id, desc)| {
+                (
+                    id.clone(),
+                    PhaneronPluginNode {
+                        id: desc.id.clone().into(),
+                        name: desc.name.clone().into(),
+                    },
+                )
+            })
+            .collect();
+
+        PhaneronPluginsState {
+            plugins_and_node_types,
+            node_descriptions,
+        }
     }
 }
 

@@ -16,7 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::plugins::PhaneronPluginsState;
 use crate::state::{PhaneronState, PhaneronStateRepresentation};
+use crate::PluginManager;
+use abi_stable::reexports::SelfOps;
 use axum::extract::ws::Message;
 use axum::extract::{State, WebSocketUpgrade};
 use axum::http::StatusCode;
@@ -70,15 +73,20 @@ pub struct Client {
 
 type Clients = Arc<Mutex<HashMap<Uuid, Client>>>;
 
-pub async fn initialize_api(state_context: PhaneronState) {
+pub async fn initialize_api(state_context: PhaneronState, plugins_context: &PluginManager) {
     info!("Initializing API");
 
     let clients: Clients = Default::default();
 
     let mut state_rx = state_context.subscribe().await;
+    let mut plugins_state_rx = plugins_context.subscribe_to_plugins().await;
 
-    let state = state_rx.recv().await.unwrap();
-    let state = Arc::new(Mutex::new(state));
+    let state = state_rx
+        .recv()
+        .await
+        .unwrap()
+        .piped(Mutex::new)
+        .piped(Arc::new);
 
     let state_clients = clients.clone();
     let state_loop = state.clone();
@@ -103,10 +111,29 @@ pub async fn initialize_api(state_context: PhaneronState) {
         }
     });
 
+    let plugins_state = plugins_state_rx
+        .recv()
+        .await
+        .unwrap()
+        .piped(Mutex::new)
+        .piped(Arc::new);
+
+    let plugins_state_loop = plugins_state.clone();
+    tokio::spawn(async move {
+        loop {
+            // TODO: Handle case of receiver closing
+            if let Ok(plugins_state) = plugins_state_rx.recv().await {
+                let mut state = plugins_state_loop.lock().await;
+                *state = plugins_state;
+            }
+        }
+    });
+
     let app_state = AppState {
-        context: state_context.clone(),
-        phaneron_state: state.clone(),
-        clients: clients.clone(),
+        context: state_context,
+        phaneron_state: state,
+        plugins_state,
+        clients,
     };
 
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 8080));
@@ -121,6 +148,7 @@ pub async fn initialize_api(state_context: PhaneronState) {
 struct AppState {
     context: PhaneronState,
     phaneron_state: Arc<Mutex<PhaneronStateRepresentation>>,
+    plugins_state: Arc<Mutex<PhaneronPluginsState>>,
     clients: Clients,
 }
 
@@ -272,7 +300,7 @@ async fn state_ws(
 
 #[axum::debug_handler]
 async fn get_plugins(state: State<AppState>) -> impl IntoResponse {
-    unimplemented!()
+    let plugins_state = state.plugins_state.lock().await;
 }
 
 #[axum::debug_handler]

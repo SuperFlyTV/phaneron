@@ -253,5 +253,5 @@ async fn main() {
         )
         .await;
 
-    phaneron::initialize_api(state.clone()).await;
+    phaneron::initialize_api(state.clone(), &plugin_manager).await;
 }

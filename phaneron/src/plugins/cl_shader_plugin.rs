@@ -427,31 +427,18 @@ impl phaneron_plugin::traits::Node for ShaderNode {
         true
     }
 
-    fn process_frame(
-        &self,
-        frame_context: phaneron_plugin::types::ProcessFrameContext,
-        video_frames: abi_stable::std_types::RHashMap<
-            phaneron_plugin::VideoInputId,
-            phaneron_plugin::VideoFrameWithId,
-        >,
-        _audio_frames: abi_stable::std_types::RHashMap<
-            phaneron_plugin::AudioInputId,
-            phaneron_plugin::AudioFrameWithId,
-        >,
-        black_frame: phaneron_plugin::VideoFrameWithId,
-        _silence_frame: phaneron_plugin::AudioFrameWithId,
-    ) {
+    fn process_frame(&self, frame_context: phaneron_plugin::types::ProcessFrameContext) {
         let mut params = ShaderParams::default();
 
         for arg in self.run_args.iter() {
             match arg {
                 ShaderRunArg::VideoInput { input_id } => {
                     params.set_param_video_frame_input(
-                        video_frames
-                            .get(input_id)
-                            .unwrap_or(&black_frame)
-                            .clone()
-                            .frame,
+                        frame_context
+                            .get_video_input(input_id)
+                            .unwrap_or(frame_context.get_black_frame())
+                            .frame
+                            .clone(),
                     );
                 }
                 ShaderRunArg::VideoOutput { output: _ } => {

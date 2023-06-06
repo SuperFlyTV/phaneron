@@ -58,14 +58,7 @@ pub trait Node: Send + Sync {
     /// Apply the given state, return true if the state has been successfully applied
     fn apply_state(&self, state: RString) -> bool;
     /// Called when the node should produce a frame.
-    fn process_frame(
-        &self,
-        frame_context: crate::types::ProcessFrameContext,
-        video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
-        audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
-        black_frame: VideoFrameWithId,
-        silence_frame: AudioFrameWithId,
-    );
+    fn process_frame(&self, frame_context: crate::types::ProcessFrameContext);
 }
 
 /// Context provided to nodes when they are initialized.
@@ -126,6 +119,10 @@ pub trait NodeContext: Send + Sync {
 pub trait ProcessFrameContext {
     /// Returns an error if called twice
     fn submit(&self) -> RResult<crate::types::FrameContext, RString>;
+    fn get_video_input(&self, id: &VideoInputId) -> ROption<&crate::VideoFrameWithId>;
+    fn get_audio_input(&self, id: &AudioInputId) -> ROption<&crate::AudioFrameWithId>;
+    fn get_black_frame(&self) -> &crate::VideoFrameWithId;
+    fn get_silence_frame(&self) -> &crate::AudioFrameWithId;
 }
 
 /// Provides proof that frame copy operations can be performed.

@@ -23,14 +23,13 @@ use std::thread::JoinHandle;
 
 use abi_stable::{
     sabi_trait::TD_Opaque,
-    std_types::{RHashMap, ROption, RSlice, RString},
+    std_types::{ROption, RSlice, RString},
 };
 use anyhow::anyhow;
 use phaneron_plugin::{
     traits::Node_TO, types::AudioFrame, types::AudioOutput, types::Node, types::NodeContext,
     types::ProcessFrameContext, types::ToAudioF32, types::ToRGBA, types::VideoFrame,
-    types::VideoOutput, AudioChannelLayout, AudioFormat, AudioFrameWithId, AudioInputId,
-    ColourSpace, VideoFormat, VideoFrameWithId, VideoInputId,
+    types::VideoOutput, AudioChannelLayout, AudioFormat, ColourSpace, VideoFormat,
 };
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -306,14 +305,7 @@ impl phaneron_plugin::traits::Node for FFmpegProducer {
         true
     }
 
-    fn process_frame(
-        &self,
-        context: ProcessFrameContext,
-        video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
-        audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
-        black_frame: VideoFrameWithId,
-        silence_frame: AudioFrameWithId,
-    ) {
+    fn process_frame(&self, context: ProcessFrameContext) {
         let frame_context = context.submit().unwrap();
 
         let video_processes_lock = self.video_processes.lock().unwrap();

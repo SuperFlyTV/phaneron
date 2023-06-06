@@ -2,13 +2,13 @@ use std::sync::Mutex;
 
 use abi_stable::{
     sabi_trait::TD_Opaque,
-    std_types::{RHashMap, ROption, RString},
+    std_types::{ROption, RString},
 };
 use serde::{Deserialize, Serialize};
 
 use phaneron_plugin::{
     traits::Node_TO, types::Node, types::NodeContext, types::ProcessFrameContext,
-    types::VideoOutput, AudioFrameWithId, AudioInputId, VideoFrameWithId, VideoInputId,
+    types::VideoOutput, VideoInputId,
 };
 
 use crate::dissolve::Dissolve;
@@ -95,14 +95,7 @@ impl phaneron_plugin::traits::Node for TraditionalMixerEmlator {
 
         true
     }
-    fn process_frame(
-        &self,
-        frame_context: ProcessFrameContext,
-        video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
-        audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
-        black_frame: VideoFrameWithId,
-        silence_frame: AudioFrameWithId,
-    ) {
+    fn process_frame(&self, frame_context: ProcessFrameContext) {
         let state = self.state.lock().unwrap();
         let (active_input, next_input) = if let Some(state) = &*state {
             (
@@ -120,15 +113,19 @@ impl phaneron_plugin::traits::Node for TraditionalMixerEmlator {
         };
 
         let active_input = if let Some(input_id) = active_input {
-            video_frames.get(&input_id).unwrap_or(&black_frame)
+            frame_context
+                .get_video_input(&input_id)
+                .unwrap_or(frame_context.get_black_frame())
         } else {
-            &black_frame
+            frame_context.get_black_frame()
         };
 
         let next_input = if let Some(input_id) = next_input {
-            video_frames.get(&input_id).unwrap_or(&black_frame)
+            frame_context
+                .get_video_input(&input_id)
+                .unwrap_or(frame_context.get_black_frame())
         } else {
-            &black_frame
+            frame_context.get_black_frame()
         };
 
         let output = if let Some(state) = &*state {

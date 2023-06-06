@@ -21,7 +21,7 @@ use std::{collections::HashMap, sync::Arc};
 use abi_stable::{
     sabi_trait::TD_Opaque,
     std_types::{
-        RArc,
+        RArc, RHashMap, ROption,
         RResult::{self, RErr, ROk},
         RStr, RString,
     },
@@ -487,11 +487,48 @@ impl RunProcessFrameContext {
     }
 }
 
-#[derive(Default)]
 pub struct ProcessFrameContextImpl {
     submitted: std::sync::Mutex<bool>,
+    video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
+    audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
+    black_frame: VideoFrameWithId,
+    silence_frame: AudioFrameWithId,
 }
+
+impl ProcessFrameContextImpl {
+    pub(crate) fn new(
+        video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
+        audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
+        black_frame: VideoFrameWithId,
+        silence_frame: AudioFrameWithId,
+    ) -> Self {
+        Self {
+            submitted: std::sync::Mutex::default(),
+            video_frames,
+            audio_frames,
+            black_frame,
+            silence_frame,
+        }
+    }
+}
+
 impl phaneron_plugin::traits::ProcessFrameContext for ProcessFrameContextImpl {
+    fn get_video_input(&self, id: &VideoInputId) -> ROption<&phaneron_plugin::VideoFrameWithId> {
+        self.video_frames.get(id).into()
+    }
+
+    fn get_audio_input(&self, id: &AudioInputId) -> ROption<&phaneron_plugin::AudioFrameWithId> {
+        self.audio_frames.get(id).into()
+    }
+
+    fn get_black_frame(&self) -> &phaneron_plugin::VideoFrameWithId {
+        &self.black_frame
+    }
+
+    fn get_silence_frame(&self) -> &phaneron_plugin::AudioFrameWithId {
+        &self.silence_frame
+    }
+
     fn submit(&self) -> RResult<phaneron_plugin::types::FrameContext, RString> {
         if *self.submitted.lock().unwrap() {
             return RErr("Already submitted".to_string().into());
@@ -727,16 +764,15 @@ pub async fn run_node(
             let black = black_frame.clone();
             let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
             std::thread::spawn(move || {
-                node.process_frame(
-                    phaneron_plugin::traits::ProcessFrameContext_TO::from_value(
-                        ProcessFrameContextImpl::default(),
-                        TD_Opaque,
+                node.process_frame(phaneron_plugin::traits::ProcessFrameContext_TO::from_value(
+                    ProcessFrameContextImpl::new(
+                        video_frames.into(),
+                        audio_frames.into(),
+                        black,
+                        silence,
                     ),
-                    video_frames.into(),
-                    audio_frames.into(),
-                    black,
-                    silence,
-                );
+                    TD_Opaque,
+                ));
                 sender.blocking_send(()).unwrap();
             });
             receiver.recv().await;

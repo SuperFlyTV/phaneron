@@ -2,14 +2,13 @@ use std::{sync::Mutex, time::Instant};
 
 use abi_stable::{
     sabi_trait::TD_Opaque,
-    std_types::{RHashMap, ROption, RString},
+    std_types::{ROption, RString},
 };
 use log::info;
 
 use phaneron_plugin::{
-    traits::Node_TO, types::FromRGBA, types::Node, types::NodeContext, types::NodeHandle,
-    types::ProcessFrameContext, AudioFrameWithId, AudioInputId, ColourSpace, InterlaceMode,
-    VideoFormat, VideoFrameWithId, VideoInputId,
+    traits::Node_TO, types::FromRGBA, types::Node, types::NodeContext, types::ProcessFrameContext,
+    ColourSpace, InterlaceMode, VideoFormat, VideoInputId,
 };
 
 pub struct TurboConsumerHandle {
@@ -35,11 +34,12 @@ pub struct TurboConsumer {
     frames: Mutex<u128>,
     from_rgba: Mutex<Option<FromRGBA>>,
     last_frame_time: Mutex<Option<Instant>>,
+    input_id: VideoInputId,
 }
 
 impl TurboConsumer {
     pub fn new(node_id: String, context: NodeContext) -> Self {
-        context.add_video_input();
+        let input_id = context.add_video_input();
 
         Self {
             node_id,
@@ -48,6 +48,7 @@ impl TurboConsumer {
             frames: Default::default(),
             from_rgba: Default::default(),
             last_frame_time: Default::default(),
+            input_id,
         }
     }
 }
@@ -57,14 +58,7 @@ impl phaneron_plugin::traits::Node for TurboConsumer {
         false
     }
 
-    fn process_frame(
-        &self,
-        frame_context: ProcessFrameContext,
-        video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
-        audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
-        black_frame: VideoFrameWithId,
-        silence_frame: AudioFrameWithId,
-    ) {
+    fn process_frame(&self, frame_context: ProcessFrameContext) {
         let mut from_rgba_lock = self.from_rgba.lock().unwrap();
         let from_rgba = from_rgba_lock.get_or_insert(self.context.create_from_rgba(
             &VideoFormat::YUV420p,
@@ -74,7 +68,10 @@ impl phaneron_plugin::traits::Node for TurboConsumer {
             InterlaceMode::Progressive,
         ));
         let mut last_frame_time = self.last_frame_time.lock().unwrap();
-        let frame = video_frames.values().next().unwrap_or(&black_frame).clone();
+        let frame = frame_context
+            .get_video_input(&self.input_id)
+            .unwrap_or(frame_context.get_black_frame())
+            .clone();
         let frame = from_rgba.process_frame(&frame_context, frame.frame);
 
         let copy_context = frame_context.submit().unwrap();

@@ -22,7 +22,7 @@ use std::time::SystemTime;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use abi_stable::sabi_trait::TD_Opaque;
-use abi_stable::std_types::{RHashMap, ROption, RString};
+use abi_stable::std_types::{ROption, RString};
 use axum::body::{Body, Bytes};
 use axum::extract::State;
 use axum::http::Method;
@@ -37,8 +37,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use phaneron_plugin::types::{FromAudioF32, FromRGBA, NodeContext};
 use phaneron_plugin::{
     traits::Node_TO, types::Node, types::ProcessFrameContext, AudioChannelLayout, AudioFormat,
-    AudioFrameWithId, AudioInputId, ColourSpace, InterlaceMode, VideoFormat, VideoFrameWithId,
-    VideoInputId,
+    AudioInputId, ColourSpace, InterlaceMode, VideoFormat, VideoInputId,
 };
 use tokio::time::{Instant, MissedTickBehavior};
 use tower::ServiceBuilder;
@@ -97,6 +96,8 @@ pub struct WebRTCConsumer {
     audio_tracks: AudioTracks,
     tokio_handle: tokio::runtime::Handle,
     tokio_terminate_sender: tokio::sync::oneshot::Sender<()>,
+    video_input: VideoInputId,
+    audio_input: AudioInputId,
 }
 
 impl WebRTCConsumer {
@@ -187,9 +188,9 @@ impl WebRTCConsumer {
 
         handle.spawn(serve_web_server(state));
 
-        context.add_video_input();
+        let video_input = context.add_video_input();
 
-        context.add_audio_input();
+        let audio_input = context.add_audio_input();
 
         Self {
             node_id,
@@ -204,6 +205,8 @@ impl WebRTCConsumer {
             audio_tracks,
             tokio_handle: handle,
             tokio_terminate_sender: terminate_sender,
+            video_input,
+            audio_input,
         }
     }
 }
@@ -212,14 +215,7 @@ impl phaneron_plugin::traits::Node for WebRTCConsumer {
     fn apply_state(&self, state: RString) -> bool {
         false
     }
-    fn process_frame(
-        &self,
-        frame_context: ProcessFrameContext,
-        video_frames: RHashMap<VideoInputId, VideoFrameWithId>,
-        audio_frames: RHashMap<AudioInputId, AudioFrameWithId>,
-        black_frame: VideoFrameWithId,
-        silence_frame: AudioFrameWithId,
-    ) {
+    fn process_frame(&self, frame_context: ProcessFrameContext) {
         let mut interval_lock = self.interval.lock().unwrap();
         let interval = interval_lock.get_or_insert_with(|| {
             self.tokio_handle.block_on(async move {
@@ -245,13 +241,15 @@ impl phaneron_plugin::traits::Node for WebRTCConsumer {
         let mut start_lock = self.start.lock().unwrap();
         let start = start_lock.get_or_insert(Instant::now());
 
-        let video_frame = video_frames.values().next().unwrap_or(&black_frame).clone();
+        let video_frame = frame_context
+            .get_video_input(&self.video_input)
+            .unwrap_or(frame_context.get_black_frame())
+            .clone();
         let video_frame = from_rgba.process_frame(&frame_context, video_frame.frame);
 
-        let audio_frame = audio_frames
-            .values()
-            .next()
-            .unwrap_or(&silence_frame)
+        let audio_frame = frame_context
+            .get_audio_input(&self.audio_input)
+            .unwrap_or(frame_context.get_silence_frame())
             .clone();
 
         let mut audio_encoder_lock = self.opus.lock().unwrap();

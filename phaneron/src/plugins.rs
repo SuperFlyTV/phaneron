@@ -51,14 +51,14 @@ pub struct DevPluginManifest {
 
 #[derive(Debug, Default, Clone)]
 pub struct PhaneronPluginsState {
-    plugins_and_node_types: HashMap<PluginId, Vec<String>>,
-    node_descriptions: HashMap<String, PhaneronPluginNode>,
+    pub plugins_and_node_types: HashMap<PluginId, Vec<String>>,
+    pub node_descriptions: HashMap<String, PhaneronPluginNode>,
 }
 
 #[derive(Debug, Clone)]
 pub struct PhaneronPluginNode {
-    id: String,
-    name: String,
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Default)]

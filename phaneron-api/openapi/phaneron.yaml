@@ -75,13 +75,13 @@ resources:
                   url:
                     type: string
                     example:
-                      url: /ws/76f374d4-5f84-44cd-a972-c097f63571db
+                      url: /ws/44a63eb7-4da3-424b-9bee-91e803c03e11/connection/76f374d4-5f84-44cd-a972-c097f63571db
                 required:
                   - url
                 additionalProperties: false
-  unregister:
+  clientConnection:
     delete:
-      operation: deleteConnectionForUser
+      operationId: deleteConnectionForUser
       tags:
         - phaneron
       sumamry: Removes a provided client connection.
@@ -107,17 +107,22 @@ resources:
                 type: object
                 properties:
                   wasConnected:
-                    type: bool
+                    type: boolean
                 required:
                   - wasConnected
                 additionalProperties: false
-  ws:
     get:
       operationId: connectWebSocket
       tags:
         - phaneron
       summary: Open a WebSocket connection.
       parameters:
+        - name: userId
+          in: path
+          description: User Id the client connection belongs to.
+          required: true
+          schema:
+            type: string
         - name: clientId
           in: path
           description: Unique Id for the connecting client.

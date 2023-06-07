@@ -1,9 +1,18 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegisterRequest {
     #[serde(rename = "userId")]
     pub user_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebSocketUpgradeRequest {
+    #[serde(rename = "userId")]
+    pub user_id: Uuid,
+    #[serde(rename = "clientId")]
+    pub client_id: Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

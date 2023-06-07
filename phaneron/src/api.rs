@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::api::rest::request::WebSocketUpgradeRequest;
 use crate::plugins::PhaneronPluginsState;
 use crate::state::{PhaneronState, PhaneronStateRepresentation};
 use crate::PluginManager;
@@ -58,7 +59,7 @@ use self::rest::request::{
     DisconnectGraphNodeInputParams, GetGraphNodeInputsParams, GetGraphNodeOutputsParams,
     GetGraphNodeParams, GetGraphNodeStateParams, GetNodeStateSchemaParams, RegisterRequest,
 };
-use self::rest::response::RegisterResponse;
+use self::rest::response::{GetAvailablePlugins200Response, RegisterResponse};
 
 mod message;
 mod rest;
@@ -196,9 +197,8 @@ fn app(state: AppState) -> Router {
         .route("/ws/:userId/connection", post(register_handler))
         .route(
             "/ws/:userId/connection/:clientId",
-            delete(unregister_handler),
+            get(state_ws).delete(unregister_handler),
         )
-        .route("/ws/:clientId", get(state_ws))
         .route("/plugins", get(get_plugins))
         .route("/plugins/:pluginId/nodes", get(get_plugin_nodes))
         .route(
@@ -252,9 +252,9 @@ async fn register_handler(
     let uuid = Uuid::new_v4();
     info!("Creating connection with Id {}", uuid);
 
-    register_client(uuid, user_id, state.clients.clone()).await;
+    register_client(uuid, user_id.clone(), state.clients.clone()).await;
     Json(RegisterResponse {
-        url: format!("ws://127.0.0.1:8080/ws/{uuid}"),
+        url: format!("ws://127.0.0.1:8080/ws/{user_id}/connection/{uuid}"),
     })
 }
 
@@ -279,7 +279,10 @@ async fn unregister_handler(state: State<AppState>, Path(id): Path<Uuid>) -> imp
 async fn state_ws(
     state: State<AppState>,
     ws: WebSocketUpgrade,
-    Path(client_id): Path<Uuid>,
+    Path(WebSocketUpgradeRequest {
+        user_id: _,
+        client_id,
+    }): Path<WebSocketUpgradeRequest>,
 ) -> impl IntoResponse {
     info!("Connection request with Id {}", client_id);
     let client = state.clients.lock().await.get(&client_id).cloned();
@@ -299,8 +302,25 @@ async fn state_ws(
 }
 
 #[axum::debug_handler]
-async fn get_plugins(state: State<AppState>) -> impl IntoResponse {
+async fn get_plugins(state: State<AppState>) -> Json<GetAvailablePlugins200Response> {
     let plugins_state = state.plugins_state.lock().await;
+    let mut plugins: Vec<rest::response::PluginDescription> = vec![];
+    for (plugin_id, plugin_nodes) in plugins_state.plugins_and_node_types.iter() {
+        let mut nodes = vec![];
+        for node_id in plugin_nodes.iter() {
+            let node = plugins_state.node_descriptions.get(node_id).unwrap();
+            nodes.push(rest::response::PluginNodeDescription {
+                id: node.id.clone(),
+                name: node.name.clone(),
+            });
+        }
+        plugins.push(rest::response::PluginDescription {
+            id: plugin_id.to_string(),
+            nodes,
+        })
+    }
+
+    Json(GetAvailablePlugins200Response { plugins })
 }
 
 #[axum::debug_handler]

@@ -13,9 +13,7 @@ paths:
   /ws/{userId}/connection:
     $ref: 'openapi/phaneron.yaml#/resources/register'
   /ws/{userId}/connection/{clientId}:
-    $ref: 'openapi/phaneron.yaml#/resources/unregister'
-  /ws/{clientId}:
-    $ref: 'openapi/phaneron.yaml#/resources/ws'
+    $ref: 'openapi/phaneron.yaml#/resources/clientConnection'
   /plugins:
     $ref: 'openapi/plugins.yaml#/resources/plugins'
   /plugins/{pluginId}/nodes:

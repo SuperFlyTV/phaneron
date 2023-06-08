@@ -17,7 +17,10 @@
  */
 
 use crate::api::rest::request::WebSocketUpgradeRequest;
-use crate::plugins::PhaneronPluginsState;
+use crate::api::rest::response::{
+    AvailablePluginNode, GetAvailablePluginNodes200Response, GraphNodeDescription,
+};
+use crate::plugins::{PhaneronPluginsState, PluginId};
 use crate::state::{PhaneronState, PhaneronStateRepresentation};
 use crate::PluginManager;
 use abi_stable::reexports::SelfOps;
@@ -59,7 +62,10 @@ use self::rest::request::{
     DisconnectGraphNodeInputParams, GetGraphNodeInputsParams, GetGraphNodeOutputsParams,
     GetGraphNodeParams, GetGraphNodeStateParams, GetNodeStateSchemaParams, RegisterRequest,
 };
-use self::rest::response::{GetAvailablePlugins200Response, RegisterResponse};
+use self::rest::response::{
+    GetAvailablePlugins200Response, GetGraphs200Response, GraphDescription,
+    PluginNotFound404Response, RegisterResponse,
+};
 
 mod message;
 mod rest;
@@ -323,11 +329,41 @@ async fn get_plugins(state: State<AppState>) -> Json<GetAvailablePlugins200Respo
     Json(GetAvailablePlugins200Response { plugins })
 }
 
-#[axum::debug_handler]
 async fn get_plugin_nodes(
     state: State<AppState>,
     Path(plugin_id): Path<Uuid>,
 ) -> impl IntoResponse {
+    let plugins_state = state.plugins_state.lock().await;
+    let plugin = plugins_state
+        .plugins_and_node_types
+        .get(&PluginId::new_from(plugin_id.to_string()));
+
+    match plugin {
+        Some(plugin_nodes) => {
+            let nodes: Vec<AvailablePluginNode> = plugin_nodes
+                .iter()
+                .map(|node_id| {
+                    let node = plugins_state.node_descriptions.get(node_id).unwrap();
+                    AvailablePluginNode {
+                        id: node.id.clone(),
+                        name: node.name.clone(),
+                    }
+                })
+                .collect();
+            (
+                StatusCode::OK,
+                Json(GetAvailablePluginNodes200Response { nodes }),
+            )
+                .into_response()
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(PluginNotFound404Response {
+                message: format!("Plugin {plugin_id} does not exist"),
+            }),
+        )
+            .into_response(),
+    }
 }
 
 #[axum::debug_handler]
@@ -335,11 +371,31 @@ async fn get_node_state_schema(
     state: State<AppState>,
     Path(GetNodeStateSchemaParams { plugin_id, node_id }): Path<GetNodeStateSchemaParams>,
 ) -> impl IntoResponse {
+    StatusCode::NOT_IMPLEMENTED
 }
 
 #[axum::debug_handler]
-async fn get_graphs(state: State<AppState>) -> impl IntoResponse {
-    unimplemented!()
+async fn get_graphs(state: State<AppState>) -> Json<GetGraphs200Response> {
+    let mut graphs: Vec<GraphDescription> = vec![];
+    let phaneron_state = state.phaneron_state.lock().await;
+    for (graph_id, graph) in phaneron_state.graphs.iter() {
+        let mut nodes: Vec<GraphNodeDescription> = vec![];
+        for node_id in graph.nodes.iter() {
+            let node = phaneron_state.nodes.get(node_id).unwrap();
+            nodes.push(GraphNodeDescription {
+                id: node_id.clone(),
+                name: node.name.clone(),
+            });
+        }
+
+        graphs.push(GraphDescription {
+            id: graph_id.clone(),
+            name: graph.name.clone(),
+            nodes,
+        });
+    }
+
+    Json(GetGraphs200Response { graphs })
 }
 
 #[axum::debug_handler]
@@ -348,7 +404,9 @@ async fn add_graph(state: State<AppState>, Json(body): Json<AddGraphRequest>) ->
 }
 
 #[axum::debug_handler]
-async fn get_graph(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {}
+async fn get_graph(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {
+    unimplemented!()
+}
 
 #[axum::debug_handler]
 async fn get_graph_nodes(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {}

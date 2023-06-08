@@ -19,6 +19,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use abi_stable::std_types::ROption::{RNone, RSome};
+use anyhow::anyhow;
 use phaneron_plugin::{
     types::Node, types::NodeHandle, AudioInputId, AudioOutputId, VideoInputId, VideoOutputId,
 };
@@ -40,6 +41,7 @@ use crate::{
 /// Representation of the state that is safe to expose to the outside world
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhaneronStateRepresentation {
+    pub graphs: HashMap<String, PhaneronGraphRepresentation>,
     pub nodes: HashMap<String, PhaneronNodeRepresentation>,
     pub video_outputs: HashMap<String, Vec<String>>,
     pub video_inputs: HashMap<String, Vec<String>>,
@@ -48,8 +50,14 @@ pub struct PhaneronStateRepresentation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhaneronNodeRepresentation {
-    name: Option<String>,
-    state: Option<String>,
+    pub name: Option<String>,
+    pub state: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaneronGraphRepresentation {
+    pub name: String,
+    pub nodes: Vec<String>,
 }
 
 pub fn create_phaneron_state(context: PhaneronComputeContext) -> PhaneronState {
@@ -308,10 +316,12 @@ impl PhaneronState {
         node: Arc<Node>,
         mut node_event_rx: tokio::sync::mpsc::UnboundedReceiver<NodeEvent>,
         semaphore_provider: ChannelSemaphoreProvider,
-    ) {
+    ) -> anyhow::Result<()> {
         let mut graphs = self.inner.graphs.lock().await;
-        let graph_entry = graphs.entry(graph_id.clone()).or_default();
-        graph_entry.push(node_id.clone());
+        let graph_entry = graphs
+            .get_mut(graph_id)
+            .ok_or(anyhow!("Graph {graph_id} does not exist"))?;
+        graph_entry.nodes.push(node_id.clone());
 
         let mut nodes = self.inner.nodes.lock().await;
         nodes.insert(
@@ -340,6 +350,8 @@ impl PhaneronState {
         ));
 
         self.inner.state_event_tx.send(()).ok();
+
+        Ok(())
     }
 
     pub async fn get_node_event_channel(
@@ -406,10 +418,21 @@ impl PhaneronState {
     }
 
     async fn get_state(&self) -> PhaneronStateRepresentation {
+        let mut graphs = HashMap::new();
         let mut nodes = HashMap::new();
         let mut video_outputs = HashMap::new();
         let mut video_inputs = HashMap::new();
         let mut connections = HashMap::new();
+
+        for (graph_id, graph) in self.inner.graphs.lock().await.iter() {
+            graphs.insert(
+                graph_id.to_string(),
+                PhaneronGraphRepresentation {
+                    name: graph.name.clone(),
+                    nodes: graph.nodes.iter().map(|node| node.to_string()).collect(),
+                },
+            );
+        }
 
         let inner_node_states = self.inner.node_states.lock().await.clone();
         for (node_id, node) in self.inner.nodes.lock().await.iter() {
@@ -445,6 +468,7 @@ impl PhaneronState {
         }
 
         PhaneronStateRepresentation {
+            graphs,
             nodes,
             video_outputs,
             video_inputs,
@@ -454,7 +478,7 @@ impl PhaneronState {
 }
 
 struct PhaneronStateInner {
-    graphs: Mutex<HashMap<GraphId, Vec<NodeId>>>,
+    graphs: Mutex<HashMap<GraphId, PhaneronStateGraph>>,
     nodes: Mutex<HashMap<NodeId, PhaneronStateNode>>,
     node_states: Mutex<HashMap<NodeId, String>>,
     audio_inputs: Mutex<HashMap<NodeId, Vec<AudioInputId>>>,
@@ -488,6 +512,11 @@ impl PhaneronStateInner {
             state_event_tx,
         }
     }
+}
+
+struct PhaneronStateGraph {
+    name: String,
+    nodes: Vec<NodeId>,
 }
 
 struct PhaneronStateNode {

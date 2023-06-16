@@ -42,6 +42,12 @@ impl NodeTypeNotFound404Response {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeTypeDoesNotMatch409Response {
+    pub existing_node_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetPhaneronState200Response {
     pub nodes: HashMap<String, PhaneronStateNode>,
     pub audio_outputs: HashMap<String, Vec<PhaneronStateNodeAudioOutput>>,
@@ -128,6 +134,24 @@ pub struct GetGraphs200Response {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct GetGraph200Response {
+    pub id: String,
+    pub name: String,
+    pub nodes: Vec<GetGraph200ResponseNode>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetGraph200ResponseNode {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetGraphNodes200Response {
+    pub nodes: Vec<PhaneronGraphNode>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GraphDescription {
     pub id: String,
     pub name: String,
@@ -198,5 +222,10 @@ pub struct AddGraph200Response {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddGraphNode200Response {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddOrUpdateGraphNode200Response {
     pub id: String,
 }

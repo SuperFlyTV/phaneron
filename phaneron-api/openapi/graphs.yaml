@@ -189,7 +189,7 @@ resources:
       operationId: putGraphNode
       tags:
         - graphs
-      summary: Adds a Node to the Graph or updates its name and state if it already exists.
+      summary: Adds a Node to the Graph or updates its name and state if it already exists, and attempts to update the node configuration if this is supported.
       parameters:
         - name: graphId
           in: path
@@ -216,6 +216,8 @@ resources:
                   type: string
                 state:
                   type: string
+                configuration:
+                  type: string
               required:
                 - nodeType
                 - name
@@ -223,7 +225,7 @@ resources:
               additionalProperties: false
       responses:
         200:
-          description: Node has been added, returns the Id of the newly created Node.
+          description: Node has been added/udated, returns the Id of the Node.
           content:
             application/json:
               schema:

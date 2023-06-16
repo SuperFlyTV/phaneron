@@ -16,10 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::api::rest::request::{GetGraphNodeInputConnectionsParams, WebSocketUpgradeRequest};
+use crate::api::rest::request::{
+    GetGraphNodeInputConnectionsParams, PutGraphNodeParams, WebSocketUpgradeRequest,
+};
 use crate::api::rest::response::{
-    AvailablePluginNode, GetAvailablePluginNodes200Response, GetNodeState200Response,
-    GraphNodeDescription, GraphNodeInput, PhaneronGraphNode, PhaneronStateNodeAudioInput,
+    AvailablePluginNode, GetAvailablePluginNodes200Response, GetGraph200ResponseNode,
+    GetNodeState200Response, GraphNodeDescription, GraphNodeInput, PhaneronGraphNode,
+    PhaneronStateNodeAudioInput,
 };
 use crate::plugins::{PhaneronPluginsState, PluginId};
 use crate::state::{PhaneronState, PhaneronStateRepresentation};
@@ -65,9 +68,10 @@ use self::rest::request::{
     GetNodeStateSchemaParams, PutGraphNodeRequest, RegisterRequest,
 };
 use self::rest::response::{
-    AddGraph200Response, AddGraphNode200Response, GetAvailablePlugins200Response,
-    GetGraphNodeInputs200Response, GetGraphs200Response, GetPhaneronState200Response,
-    GraphDescription, GraphNotFound404Response, NodeTypeNotFound404Response,
+    AddGraph200Response, AddGraphNode200Response, AddOrUpdateGraphNode200Response,
+    GetAvailablePlugins200Response, GetGraph200Response, GetGraphNodeInputs200Response,
+    GetGraphNodes200Response, GetGraphs200Response, GetPhaneronState200Response, GraphDescription,
+    GraphNotFound404Response, NodeTypeDoesNotMatch409Response, NodeTypeNotFound404Response,
     PhaneronGraphNodeAudioInput, PhaneronGraphNodeAudioOutput, PhaneronGraphNodeVideoInput,
     PhaneronGraphNodeVideoOutput, PhaneronStateNodeAudioOutput, PhaneronStateNodeVideoInput,
     PhaneronStateNodeVideoOutput, PluginNotFound404Response, RegisterResponse,
@@ -196,6 +200,7 @@ fn app(state: AppState) -> Router {
         .allow_methods(vec![
             Method::GET,
             Method::POST,
+            Method::PUT,
             Method::DELETE,
             Method::OPTIONS,
         ])
@@ -478,21 +483,116 @@ async fn get_graphs(state: State<AppState>) -> Json<GetGraphs200Response> {
 
 #[axum::debug_handler]
 async fn add_graph(state: State<AppState>, Json(body): Json<AddGraphRequest>) -> impl IntoResponse {
-    let id = GraphId::default();
-    match state.context.add_grah(&id, body.name).await {
-        Ok(_) => Json(AddGraph200Response { id: id.to_string() }).into_response(),
+    let graph_id = GraphId::default();
+    match state.context.add_grah(&graph_id, body.name).await {
+        Ok(_) => Json(AddGraph200Response {
+            id: graph_id.to_string(),
+        })
+        .into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     }
 }
 
 #[axum::debug_handler]
-async fn get_graph(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {
-    unimplemented!()
+async fn get_graph(state: State<AppState>, Path(graph_id): Path<String>) -> impl IntoResponse {
+    let phaneron_state = state.phaneron_state.lock().await;
+    let graph = phaneron_state.graphs.get(&graph_id);
+    let graph = match graph {
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(GraphNotFound404Response::new(format!(
+                    "Graph {graph_id} not found"
+                ))),
+            )
+                .into_response();
+        }
+        Some(graph) => graph,
+    };
+
+    let mut nodes = Vec::with_capacity(graph.nodes.len());
+    for node_id in graph.nodes.iter() {
+        let node = phaneron_state.nodes.get(node_id).unwrap();
+        nodes.push(GetGraph200ResponseNode {
+            id: node_id.clone(),
+            name: node.name.clone(),
+        });
+    }
+
+    (
+        StatusCode::OK,
+        Json(GetGraph200Response {
+            id: graph_id,
+            name: graph.name.clone(),
+            nodes,
+        }),
+    )
+        .into_response()
 }
 
 #[axum::debug_handler]
-async fn get_graph_nodes(state: State<AppState>, Path(graph_id): Path<Uuid>) -> impl IntoResponse {
-    unimplemented!()
+async fn get_graph_nodes(
+    state: State<AppState>,
+    Path(graph_id): Path<String>,
+) -> impl IntoResponse {
+    let phaneron_state = state.phaneron_state.lock().await;
+
+    let graph = match phaneron_state.graphs.get(&graph_id) {
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(GraphNotFound404Response::new(format!(
+                    "Graph {graph_id} not found"
+                ))),
+            )
+                .into_response();
+        }
+        Some(graph) => graph,
+    };
+
+    let mut nodes: Vec<PhaneronGraphNode> = vec![];
+    for node_id in graph.nodes.iter() {
+        let node = phaneron_state.nodes.get(node_id).unwrap();
+        nodes.push(PhaneronGraphNode {
+            id: node_id.clone(),
+            name: node.name.clone(),
+            node_type: node.node_type.clone(),
+            state: node.state.clone(),
+            audio_inputs: phaneron_state
+                .audio_inputs
+                .get(node_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|id| PhaneronGraphNodeAudioInput { id })
+                .collect(),
+            video_inputs: phaneron_state
+                .video_inputs
+                .get(node_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|id| PhaneronGraphNodeVideoInput { id })
+                .collect(),
+            audio_outputs: phaneron_state
+                .audio_inputs
+                .get(node_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|id| PhaneronGraphNodeAudioOutput { id })
+                .collect(),
+            video_outputs: phaneron_state
+                .audio_inputs
+                .get(node_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|id| PhaneronGraphNodeVideoOutput { id })
+                .collect(),
+        })
+    }
+    (StatusCode::OK, Json(GetGraphNodes200Response { nodes })).into_response()
 }
 
 async fn add_graph_node(
@@ -617,10 +717,86 @@ async fn get_graph_node(
 #[axum::debug_handler]
 async fn add_or_update_graph_node(
     state: State<AppState>,
-    Path(graph_id): Path<Uuid>,
+    Path(PutGraphNodeParams { graph_id, node_id }): Path<PutGraphNodeParams>,
     Json(body): Json<PutGraphNodeRequest>,
 ) -> impl IntoResponse {
-    unimplemented!()
+    let phaneron_state = state.phaneron_state.lock().await;
+    if !phaneron_state.graphs.contains_key(&graph_id.to_string()) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(GraphNotFound404Response::new(graph_id.to_string())),
+        )
+            .into_response();
+    }
+
+    let node = phaneron_state.nodes.get(&node_id);
+    match node {
+        Some(existing_node) => {
+            if existing_node.node_type != body.node_type {
+                return (
+                    StatusCode::CONFLICT,
+                    Json(NodeTypeDoesNotMatch409Response {
+                        existing_node_type: existing_node.node_type.clone(),
+                    }),
+                )
+                    .into_response();
+            }
+
+            let graph_id = GraphId::new_from(graph_id);
+            let node_id = NodeId::new_from(node_id);
+            state
+                .context
+                .set_node_name(&graph_id, &node_id, body.name)
+                .await;
+            state
+                .context
+                .set_node_state(&graph_id, &node_id, body.state)
+                .await;
+            // TODO: Set configuration
+
+            (
+                StatusCode::OK,
+                Json(AddOrUpdateGraphNode200Response {
+                    id: node_id.to_string(),
+                }),
+            )
+                .into_response()
+        }
+        None => {
+            let node_id = NodeId::new_from(node_id);
+            match state
+                .context
+                .add_node(
+                    &GraphId::new_from(graph_id.to_string()),
+                    &node_id,
+                    CreateNode {
+                        node_type: body.node_type.clone(),
+                        node_name: body.name,
+                        state: body.state,
+                        configuration: body.configuration,
+                    },
+                )
+                .await
+            {
+                Ok(_) => Json(AddGraphNode200Response {
+                    id: node_id.to_string(),
+                })
+                .into_response(),
+                Err(err) => match err {
+                    crate::state::AddNodeError::GraphDoesNotExist => (
+                        StatusCode::NOT_FOUND,
+                        Json(GraphNotFound404Response::new(graph_id.to_string())),
+                    )
+                        .into_response(),
+                    crate::state::AddNodeError::NodeTypeDoesNotExist => (
+                        StatusCode::NOT_FOUND,
+                        Json(NodeTypeNotFound404Response::new(body.node_type)),
+                    )
+                        .into_response(),
+                },
+            }
+        }
+    }
 }
 
 #[axum::debug_handler]

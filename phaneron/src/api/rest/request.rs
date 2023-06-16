@@ -46,11 +46,20 @@ pub struct GetGraphNodeParams {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct PutGraphNodeParams {
+    #[serde(rename = "graphId")]
+    pub graph_id: String,
+    #[serde(rename = "nodeId")]
+    pub node_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PutGraphNodeRequest {
     #[serde(rename = "nodeType")]
     pub node_type: String,
     pub name: String,
     pub state: String,
+    pub configuration: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

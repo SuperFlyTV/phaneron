@@ -99,6 +99,60 @@ resources:
             application/json:
               schema:
                 $ref: '#/components/schemas/graphNotFound'
+    post:
+      operationId: addGraphNode
+      tags:
+        - graphs
+      summary: Adds a Node to the Graph
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: Node to add.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nodeType:
+                  type: string
+                  description: The type of Node to create (can be retrieved by querying the Node types avilable from Plugins).
+                name:
+                  type: string
+                state:
+                  type: string
+                configuration:
+                  type: string
+              required:
+                - nodeType
+                - name
+                - state
+              additionalProperties: false
+      responses:
+        200:
+          description: Node has been added, returns the Id of the newly created Node.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                required:
+                  - id
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/graphNotFound'
+                  - $ref: '#/components/schemas/nodeTypeNotFound'
   graphNode:
     get:
       operationId: getGraphNode
@@ -122,15 +176,7 @@ resources:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  nodes:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/phaneronGraphNode'
-                required:
-                  - nodes
-                additionalProperties: false
+                $ref: '#/components/schemas/phaneronGraphNode'
         404:
           description: Invalid parameter.
           content:
@@ -139,6 +185,73 @@ resources:
                 oneOf:
                   - $ref: '#/components/schemas/graphNotFound'
                   - $ref: '#/components/schemas/graphNodeNotFound'
+    put:
+      operationId: putGraphNode
+      tags:
+        - graphs
+      summary: Adds a Node to the Graph or updates its name and state if it already exists.
+      parameters:
+        - name: graphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: Node to add.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nodeType:
+                  type: string
+                  description: The type of Node to create (can be retrieved by querying the Node types avilable from Plugins).
+                name:
+                  type: string
+                state:
+                  type: string
+              required:
+                - nodeType
+                - name
+                - state
+              additionalProperties: false
+      responses:
+        200:
+          description: Node has been added, returns the Id of the newly created Node.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                required:
+                  - id
+                additionalProperties: false
+        404:
+          description: Invalid parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/graphNotFound'
+        409:
+          description: The nodeType specified does not match the type of the existing Node.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  existingNodeType:
+                    type: string
+                required:
+                  - existingNodeType
+                additionalProperties: false
   graphNodeState:
     get:
       operationId: getNodeState
@@ -421,31 +534,58 @@ components:
           type: string
         name:
           type: string
+        nodeType:
+          type: string
         state:
           type: string
         audioInputs:
           type: array
-          description: Array of input Ids.
+          description: Array of inputs.
           items:
-            type: string
+            type: object
+            properties:
+              id:
+                type: string
+              required:
+                - id
+              additionalProperties: false
         videoInputs:
           type: array
-          description: Array of input Ids.
+          description: Array of inputs.
           items:
-            type: string
+            type: object
+            properties:
+              id:
+                type: string
+              required:
+                - id
+              additionalProperties: false
         audioOutputs:
           type: array
-          description: Array of output Ids.
+          description: Array of outputs.
           items:
-            type: string
+            type: object
+            properties:
+              id:
+                type: string
+              required:
+                - id
+              additionalProperties: false
         videoOutputs:
           type: array
-          description: Array of input Ids.
+          description: Array of outputs.
           items:
-            type: string
+            type: object
+            properties:
+              id:
+                type: string
+              required:
+                - id
+              additionalProperties: false
       required:
         - id
         - name
+        - nodeType
         - state
         - audioInputs
         - videoInputs
@@ -457,15 +597,20 @@ components:
       properties:
         id:
           type: string
+        inputType:
+          type: string
         connectedOutputId:
           type: string
       required:
         - id
+        - inputType
       additionalProperties: false
     nodeOutput:
       type: object
       properties:
         id:
+          type: string
+        outputType:
           type: string
         connectedInputIds:
           type: array
@@ -473,6 +618,7 @@ components:
             type: string
       required:
         - id
+        - outputType
         - connectedInputIds
       additionalProperties: false
     graphNotFound:
@@ -492,7 +638,7 @@ components:
       properties:
         notFound:
           type: string
-          const: graph
+          const: node
         message:
           type: string
       required:
@@ -504,12 +650,24 @@ components:
       properties:
         notFound:
           type: string
-          const: graph
+          const: input
         message:
           type: string
       required:
         - notFound
         - message
+      additionalProperties: false
+    nodeTypeNotFound:
+      type: object
+      properties:
+        notFound:
+          type: string
+          const: node_type
+        invalidNodeType:
+          type: string
+      required:
+        - notFound
+        - invalidNodeType
       additionalProperties: false
   responses:
     graphAdded:

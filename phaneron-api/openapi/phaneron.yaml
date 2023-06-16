@@ -156,22 +156,46 @@ components:
       additionalProperties:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+          additionalProperties: false
     audioInputsMap:
       type: object
       additionalProperties:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+          additionalProperties: false
     videoOutputsMap:
       type: object
       additionalProperties:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+          additionalProperties: false
     videoInputsMap:
       type: object
       additionalProperties:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+          additionalProperties: false

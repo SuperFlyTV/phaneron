@@ -43,15 +43,19 @@ use crate::{
 pub struct PhaneronStateRepresentation {
     pub graphs: HashMap<String, PhaneronGraphRepresentation>,
     pub nodes: HashMap<String, PhaneronNodeRepresentation>,
+    pub audio_outputs: HashMap<String, Vec<String>>,
+    pub audio_inputs: HashMap<String, Vec<String>>,
     pub video_outputs: HashMap<String, Vec<String>>,
     pub video_inputs: HashMap<String, Vec<String>>,
+    /// Map of InputId -> OutputId
     pub connections: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhaneronNodeRepresentation {
-    pub name: Option<String>,
-    pub state: Option<String>,
+    pub node_type: String,
+    pub name: String,
+    pub state: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,10 +64,14 @@ pub struct PhaneronGraphRepresentation {
     pub nodes: Vec<String>,
 }
 
-pub fn create_phaneron_state(context: PhaneronComputeContext) -> PhaneronState {
+pub fn create_phaneron_state(
+    context: PhaneronComputeContext,
+    plugin_manager: Arc<PluginManager>,
+) -> PhaneronState {
     let (node_event_tx, node_event_rx) = tokio::sync::mpsc::unbounded_channel();
     let (state_event_tx, state_event_rx) = tokio::sync::broadcast::channel(10);
     let inner = Arc::new(PhaneronStateInner::new(
+        plugin_manager,
         node_event_tx,
         state_event_tx.clone(),
     ));
@@ -86,10 +94,9 @@ pub fn create_phaneron_state(context: PhaneronComputeContext) -> PhaneronState {
 }
 
 pub struct CreateNode {
-    pub node_id: String,
     pub node_type: String,
-    pub node_name: Option<String>,
-    pub state: Option<String>,
+    pub node_name: String,
+    pub state: String,
     pub configuration: Option<String>,
 }
 
@@ -106,6 +113,11 @@ pub struct CreateConnection {
     pub to_input_index: usize,
 }
 
+pub enum AddNodeError {
+    GraphDoesNotExist,
+    NodeTypeDoesNotExist,
+}
+
 #[derive(Clone)]
 pub struct PhaneronState {
     context: PhaneronComputeContext,
@@ -113,21 +125,50 @@ pub struct PhaneronState {
 }
 
 impl PhaneronState {
-    pub async fn create_graph(
+    pub async fn add_grah(&self, graph_id: &GraphId, graph_name: String) -> anyhow::Result<()> {
+        let mut graphs = self.inner.graphs.lock().await;
+        if graphs.contains_key(graph_id) {
+            return Err(anyhow!("Graph {graph_id} already exists"));
+        }
+
+        graphs.insert(
+            graph_id.clone(),
+            PhaneronStateGraph {
+                name: graph_name,
+                nodes: vec![],
+            },
+        );
+
+        Ok(())
+    }
+
+    /*pub async fn create_graph(
         &self,
         plugin_manager: &PluginManager,
         graph_id: &GraphId,
+        graph_name: String,
         nodes: Vec<CreateNode>,
         connections: Vec<CreateConnection>,
     ) -> anyhow::Result<()> {
-        let mut created_node_handles: Vec<(NodeId, NodeHandle)> = vec![];
+        {
+            let mut graphs = self.inner.graphs.lock().await;
+            graphs
+                .entry(graph_id.clone())
+                .or_insert(PhaneronStateGraph {
+                    name: graph_name.clone(),
+                    nodes: vec![],
+                })
+                .name = graph_name.clone();
+        }
+
+        let mut created_node_handles: Vec<(NodeId, String, NodeHandle)> = vec![];
         let mut node_configurations: HashMap<NodeId, String> = HashMap::new();
         for create_node in nodes.iter() {
             let node = plugin_manager
                 .create_node_handle(create_node.node_id.clone(), create_node.node_type.clone())
                 .unwrap(); // TODO: Don't panic!
             let node_id = NodeId::new_from(create_node.node_id.clone());
-            created_node_handles.push((node_id.clone(), node));
+            created_node_handles.push((node_id.clone(), create_node.node_type.clone(), node));
             if let Some(config) = &create_node.configuration {
                 node_configurations.insert(node_id, config.clone());
             }
@@ -136,13 +177,14 @@ impl PhaneronState {
         let mut initialzed_nodes: HashMap<
             NodeId,
             (
+                String,
                 Node,
                 NodeRunContext,
                 UnboundedReceiver<NodeEvent>,
                 ChannelSemaphoreProvider,
             ),
         > = HashMap::new();
-        for (node_id, handle) in created_node_handles {
+        for (node_id, node_type, handle) in created_node_handles {
             let (node_context, node_run_context, state_rx, semaphore_provider) =
                 create_node_context(
                     self.context.clone(),
@@ -163,34 +205,41 @@ impl PhaneronState {
             let node = receiver.await.unwrap();
             initialzed_nodes.insert(
                 node_id,
-                (node, node_run_context, state_rx, semaphore_provider),
+                (
+                    node_type,
+                    node,
+                    node_run_context,
+                    state_rx,
+                    semaphore_provider,
+                ),
             );
         }
 
         for create_node in nodes {
             let node_id = NodeId::new_from(create_node.node_id.clone());
-            let (node, run_context, node_event_rx, semaphore_provider) =
+            let (node_type, node, run_context, node_event_rx, semaphore_provider) =
                 initialzed_nodes.remove(&node_id).unwrap();
             let node = Arc::new(node);
-            if let Some(state) = create_node.state {
-                apply_node_state(
-                    node_id.clone(),
-                    node.clone(),
-                    state,
-                    self.inner.node_event_tx.clone(),
-                )
-                .await;
-            }
+            apply_node_state(
+                node_id.clone(),
+                node.clone(),
+                create_node.state,
+                self.inner.node_event_tx.clone(),
+            )
+            .await;
+
             self.add_node(
                 graph_id,
                 &node_id,
+                node_type,
                 create_node.node_name,
                 run_context,
                 node,
                 node_event_rx,
                 semaphore_provider,
             )
-            .await;
+            .await
+            .unwrap();
         }
 
         for connection in connections {
@@ -305,47 +354,77 @@ impl PhaneronState {
         }
 
         Ok(())
-    }
+    }*/
 
-    async fn add_node<'a>(
+    pub async fn add_node<'a>(
         &self,
         graph_id: &'a GraphId,
         node_id: &'a NodeId,
-        name: Option<String>,
-        node_context: NodeRunContext,
-        node: Arc<Node>,
-        mut node_event_rx: tokio::sync::mpsc::UnboundedReceiver<NodeEvent>,
-        semaphore_provider: ChannelSemaphoreProvider,
-    ) -> anyhow::Result<()> {
+        create_node: CreateNode,
+    ) -> anyhow::Result<(), AddNodeError> {
         let mut graphs = self.inner.graphs.lock().await;
         let graph_entry = graphs
             .get_mut(graph_id)
-            .ok_or(anyhow!("Graph {graph_id} does not exist"))?;
-        graph_entry.nodes.push(node_id.clone());
+            .ok_or(AddNodeError::GraphDoesNotExist)?;
+
+        let node = self
+            .inner
+            .plugin_manager
+            .create_node_handle(node_id.to_string(), create_node.node_type.clone())
+            .unwrap(); // TODO: Don't panic!
+
+        let (node_context, node_run_context, mut state_rx, semaphore_provider) =
+            create_node_context(
+                self.context.clone(),
+                node_id.clone(),
+                self.get_node_event_channel().await,
+            )
+            .await;
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        std::thread::spawn(move || {
+            let configuration = match create_node.configuration {
+                Some(config) => RSome(config.into()),
+                None => RNone,
+            };
+            let node = node.initialize(node_context, configuration);
+            sender.send(node).ok();
+        });
+        let node = receiver.await.unwrap();
+
+        let node = Arc::new(node);
+        apply_node_state(
+            node_id.clone(),
+            node.clone(),
+            create_node.state,
+            self.inner.node_event_tx.clone(),
+        )
+        .await;
 
         let mut nodes = self.inner.nodes.lock().await;
         nodes.insert(
             node_id.clone(),
             PhaneronStateNode {
-                name,
-                context: node_context.clone(),
+                node_type: create_node.node_type,
+                name: create_node.node_name,
+                context: node_run_context.clone(),
             },
         );
 
-        let pending_state_channel = node_context.get_pending_state_channel();
+        let pending_state_channel = node_run_context.get_pending_state_channel();
 
         // Block and handle initial events
-        while let Ok(event) = node_event_rx.try_recv() {
-            handle_node_event(event, node_context.clone()).await;
+        while let Ok(event) = state_rx.try_recv() {
+            handle_node_event(event, node_run_context.clone()).await;
         }
 
+        graph_entry.nodes.push(node_id.clone());
         tokio::spawn(run_node(
             self.context.clone(),
-            node_context,
+            node_run_context,
             node,
             pending_state_channel,
             self.get_node_event_channel().await,
-            node_event_rx,
+            state_rx,
             semaphore_provider,
         ));
 
@@ -360,7 +439,7 @@ impl PhaneronState {
         self.inner.node_event_tx.clone()
     }
 
-    pub async fn set_node_name(&self, graph_id: &GraphId, node_id: &NodeId, name: Option<String>) {
+    pub async fn set_node_name(&self, graph_id: &GraphId, node_id: &NodeId, name: String) {
         let mut nodes = self.inner.nodes.lock().await;
         let node = nodes.get_mut(node_id).unwrap();
         node.name = name;
@@ -420,6 +499,8 @@ impl PhaneronState {
     async fn get_state(&self) -> PhaneronStateRepresentation {
         let mut graphs = HashMap::new();
         let mut nodes = HashMap::new();
+        let mut audio_outputs = HashMap::new();
+        let mut audio_inputs = HashMap::new();
         let mut video_outputs = HashMap::new();
         let mut video_inputs = HashMap::new();
         let mut connections = HashMap::new();
@@ -437,12 +518,31 @@ impl PhaneronState {
         let inner_node_states = self.inner.node_states.lock().await.clone();
         for (node_id, node) in self.inner.nodes.lock().await.iter() {
             let node_state = inner_node_states.get(node_id);
-            nodes.insert(
+            if let Some(node_state) = node_state {
+                nodes.insert(
+                    node_id.to_string(),
+                    PhaneronNodeRepresentation {
+                        node_type: node.node_type.clone(),
+                        name: node.name.clone(),
+                        state: node_state.clone(),
+                    },
+                );
+            }
+        }
+
+        let inner_audio_outputs = self.inner.audio_outputs.lock().await.clone();
+        for (node_id, output) in inner_audio_outputs.iter() {
+            audio_outputs.insert(
                 node_id.to_string(),
-                PhaneronNodeRepresentation {
-                    name: node.name.clone(),
-                    state: node_state.cloned(),
-                },
+                output.iter().map(|o| o.to_string()).collect(),
+            );
+        }
+
+        let inner_audio_inputs = self.inner.audio_inputs.lock().await.clone();
+        for (node_id, output) in inner_audio_inputs.iter() {
+            audio_inputs.insert(
+                node_id.to_string(),
+                output.iter().map(|o| o.to_string()).collect(),
             );
         }
 
@@ -470,6 +570,8 @@ impl PhaneronState {
         PhaneronStateRepresentation {
             graphs,
             nodes,
+            audio_outputs,
+            audio_inputs,
             video_outputs,
             video_inputs,
             connections,
@@ -478,6 +580,7 @@ impl PhaneronState {
 }
 
 struct PhaneronStateInner {
+    plugin_manager: Arc<PluginManager>,
     graphs: Mutex<HashMap<GraphId, PhaneronStateGraph>>,
     nodes: Mutex<HashMap<NodeId, PhaneronStateNode>>,
     node_states: Mutex<HashMap<NodeId, String>>,
@@ -494,10 +597,12 @@ struct PhaneronStateInner {
 
 impl PhaneronStateInner {
     fn new(
+        plugin_manager: Arc<PluginManager>,
         node_event_tx: tokio::sync::mpsc::UnboundedSender<NodeStateEvent>,
         state_event_tx: tokio::sync::broadcast::Sender<()>,
     ) -> Self {
         Self {
+            plugin_manager,
             graphs: Default::default(),
             nodes: Default::default(),
             node_states: Default::default(),
@@ -520,7 +625,8 @@ struct PhaneronStateGraph {
 }
 
 struct PhaneronStateNode {
-    name: Option<String>,
+    node_type: String,
+    name: String,
     context: NodeRunContext,
 }
 

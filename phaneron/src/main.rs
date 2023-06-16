@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::Arc};
 
 use abi_stable::sabi_trait::TD_Opaque;
 use phaneron::{
@@ -126,7 +126,6 @@ async fn main() {
     );
 
     let context = phaneron::create_compute_context().await;
-    let state = create_phaneron_state(context.clone());
 
     info!("Loading plugins");
     let mut plugin_manager = PluginManager::default();
@@ -143,41 +142,51 @@ async fn main() {
         .add_plugin(PhaneronPlugin_TO::from_value(shader_plugin, TD_Opaque))
         .unwrap();
 
+    let plugin_manager = Arc::new(plugin_manager);
+    let state = create_phaneron_state(context.clone(), plugin_manager.clone());
+
     let graph_id = phaneron::GraphId::new_from("graph1".to_string());
     let mut create_nodes = vec![
-        CreateNode {
-            node_id: "active_input_webrtc_consumer".to_string(),
-            node_type: "webrtc_consumer".to_string(),
-            node_name: None,
-            state: None,
-            configuration: None,
-        },
-        CreateNode {
-            node_id: "switcher".to_string(),
-            node_type: "traditional_mixer_emulator".to_string(),
-            node_name: None,
-            state: Some(
-                serde_json::to_string(&TraditionalMixerEmulatorState {
+        (
+            graph_id.clone(),
+            phaneron::NodeId::new_from("active_input_webrtc_consumer".to_string()),
+            CreateNode {
+                node_type: "webrtc_consumer".to_string(),
+                node_name: "WebRTC Consumer".to_string(),
+                state: "{}".to_string(),
+                configuration: None,
+            },
+        ),
+        (
+            graph_id.clone(),
+            phaneron::NodeId::new_from("switcher".to_string()),
+            CreateNode {
+                node_type: "traditional_mixer_emulator".to_string(),
+                node_name: "Switcher".to_string(),
+                state: serde_json::to_string(&TraditionalMixerEmulatorState {
                     active_input: None,
                     next_input: None,
                     transition: None,
                 })
                 .unwrap(),
-            ),
-            configuration: Some(
-                serde_json::to_string(&TraditionalMixerEmulatorConfiguration {
-                    number_of_inputs: video_inputs.videos.len(),
-                })
-                .unwrap(),
-            ),
-        },
-        CreateNode {
-            node_id: "flipper".to_string(),
-            node_type: "flip".to_string(),
-            node_name: Some("flip".to_string()),
-            state: None,
-            configuration: None,
-        },
+                configuration: Some(
+                    serde_json::to_string(&TraditionalMixerEmulatorConfiguration {
+                        number_of_inputs: video_inputs.videos.len(),
+                    })
+                    .unwrap(),
+                ),
+            },
+        ),
+        (
+            graph_id.clone(),
+            phaneron::NodeId::new_from("flipper".to_string()),
+            CreateNode {
+                node_type: "flip".to_string(),
+                node_name: "flip".to_string(),
+                state: "{}".to_string(),
+                configuration: None,
+            },
+        ),
     ];
     let mut connections = vec![
         CreateConnection {
@@ -197,18 +206,19 @@ async fn main() {
     ];
     for (index, input) in video_inputs.videos.iter().enumerate() {
         let ffmpeg_producer_id = phaneron::NodeId::default();
-        create_nodes.push(CreateNode {
-            node_id: ffmpeg_producer_id.to_string(),
-            node_type: "ffmpeg_producer".to_string(),
-            node_name: Some(input.display_name.clone()),
-            state: Some(
-                serde_json::to_string(&FFmpegProducerState {
+        create_nodes.push((
+            graph_id.clone(),
+            phaneron::NodeId::new_from(ffmpeg_producer_id.to_string()),
+            CreateNode {
+                node_type: "ffmpeg_producer".to_string(),
+                node_name: input.display_name.clone(),
+                state: serde_json::to_string(&FFmpegProducerState {
                     file: input.path.to_string(),
                 })
                 .unwrap(),
-            ),
-            configuration: None,
-        });
+                configuration: None,
+            },
+        ));
         connections.push(CreateConnection {
             connection_type: CreateConnectionType::Video,
             from_node_id: ffmpeg_producer_id.to_string(),
@@ -229,10 +239,16 @@ async fn main() {
         }
     }
 
-    state
-        .create_graph(&plugin_manager, &graph_id, create_nodes, connections)
-        .await
-        .unwrap();
+    /*state
+    .create_graph(
+        &plugin_manager,
+        &graph_id,
+        "Graph 1".to_string(),
+        create_nodes,
+        connections,
+    )
+    .await
+    .unwrap();*/
 
     let available_inputs = state
         .get_available_video_inputs(&graph_id, &NodeId::new_from("switcher".to_string()))

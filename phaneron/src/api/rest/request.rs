@@ -29,11 +29,28 @@ pub struct AddGraphRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct AddGraphNodeRequest {
+    #[serde(rename = "nodeType")]
+    pub node_type: String,
+    pub name: String,
+    pub state: String,
+    pub configuration: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetGraphNodeParams {
     #[serde(rename = "graphId")]
     pub graph_id: String,
     #[serde(rename = "nodeId")]
     pub node_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PutGraphNodeRequest {
+    #[serde(rename = "nodeType")]
+    pub node_type: String,
+    pub name: String,
+    pub state: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,8 +67,6 @@ pub struct GetGraphNodeInputsParams {
     pub graph_id: String,
     #[serde(rename = "nodeId")]
     pub node_id: String,
-    #[serde(rename = "inputId")]
-    pub input_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

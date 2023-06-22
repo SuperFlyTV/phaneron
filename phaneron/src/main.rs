@@ -145,7 +145,7 @@ async fn main() {
     let plugin_manager = Arc::new(plugin_manager);
     let state = create_phaneron_state(context.clone(), plugin_manager.clone());
 
-    let graph_id = phaneron::GraphId::new_from("graph1".to_string());
+    /*let graph_id = phaneron::GraphId::new_from("graph1".to_string());
     let mut create_nodes = vec![
         (
             graph_id.clone(),
@@ -237,7 +237,7 @@ async fn main() {
                 to_input_index: 0,
             });
         }
-    }
+    }*/
 
     /*state
     .create_graph(
@@ -250,7 +250,7 @@ async fn main() {
     .await
     .unwrap();*/
 
-    let available_inputs = state
+    /*let available_inputs = state
         .get_available_video_inputs(&graph_id, &NodeId::new_from("switcher".to_string()))
         .await;
 
@@ -267,7 +267,7 @@ async fn main() {
             &NodeId::new_from("switcher".to_string()),
             serde_json::to_string(&switcher_state).unwrap(),
         )
-        .await;
+        .await;*/
 
     phaneron::initialize_api(state.clone(), &plugin_manager).await;
 }

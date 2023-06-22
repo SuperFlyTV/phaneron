@@ -127,16 +127,23 @@ components:
       description: The specified Plugin does not exist.
       type: object
       properties:
+        notFound:
+          type: string
+          const: plugin
         message:
           type: string
           example: Plugin 40570029-ab5e-4bab-b610-b0ede8dd4533 does not exist.
       required:
+        - notFound
         - message
       additionalProperties: false
     nodeNotFound:
       description: The specified Node does not exist.
       type: object
       properties:
+      notFound:
+          type: string
+          const: node
         message:
           type: string
           example: Node ed14b0f2-c26a-4923-a89a-b9edd2655836 does not exist.

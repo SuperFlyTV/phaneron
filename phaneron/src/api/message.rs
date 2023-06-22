@@ -35,6 +35,7 @@ pub struct TopicsRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodeStateRequest {
+    pub graph_id: String,
     pub node_id: String,
     pub state: String,
 }

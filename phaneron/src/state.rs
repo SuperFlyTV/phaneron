@@ -49,6 +49,8 @@ pub struct PhaneronStateRepresentation {
     pub video_inputs: HashMap<String, Vec<String>>,
     /// Map of InputId -> OutputId
     pub connections: HashMap<String, String>,
+    /// Map of OutputId -> InputIds
+    pub output_to_input_connections: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -433,6 +435,80 @@ impl PhaneronState {
         Ok(())
     }
 
+    pub async fn make_audio_connection(
+        &self,
+        from_node_id: &NodeId,
+        from_output_id: &AudioOutputId,
+        to_node_id: &NodeId,
+        to_input_id: &AudioInputId,
+    ) -> anyhow::Result<()> {
+        let audio_pipe = {
+            let nodes_lock = self.inner.nodes.lock().await;
+            let from_node = nodes_lock.get(from_node_id).unwrap();
+            from_node.context.get_audio_pipe(&from_output_id).await
+        };
+
+        let to_node_context = {
+            let nodes_lock = self.inner.nodes.lock().await;
+            let to_node = nodes_lock.get(to_node_id).unwrap();
+            to_node.context.clone()
+        };
+
+        to_node_context
+            .connect_audio_pipe(&to_input_id, audio_pipe)
+            .await
+            .unwrap();
+
+        audio_pipe_connected(
+            PhaneronState {
+                context: self.context.clone(),
+                inner: self.inner.clone(),
+            },
+            to_input_id.clone(),
+            from_output_id.clone(),
+        )
+        .await;
+
+        Ok(())
+    }
+
+    pub async fn make_video_connection(
+        &self,
+        from_node_id: &NodeId,
+        from_output_id: &VideoOutputId,
+        to_node_id: &NodeId,
+        to_input_id: &VideoInputId,
+    ) -> anyhow::Result<()> {
+        let video_pipe = {
+            let nodes_lock = self.inner.nodes.lock().await;
+            let from_node = nodes_lock.get(from_node_id).unwrap();
+            from_node.context.get_video_pipe(&from_output_id).await
+        };
+
+        let to_node_context = {
+            let nodes_lock = self.inner.nodes.lock().await;
+            let to_node = nodes_lock.get(to_node_id).unwrap();
+            to_node.context.clone()
+        };
+
+        to_node_context
+            .connect_video_pipe(&to_input_id, video_pipe)
+            .await
+            .unwrap();
+
+        video_pipe_connected(
+            PhaneronState {
+                context: self.context.clone(),
+                inner: self.inner.clone(),
+            },
+            to_input_id.clone(),
+            from_output_id.clone(),
+        )
+        .await;
+
+        Ok(())
+    }
+
     pub async fn get_node_event_channel(
         &self,
     ) -> tokio::sync::mpsc::UnboundedSender<NodeStateEvent> {
@@ -504,6 +580,7 @@ impl PhaneronState {
         let mut video_outputs = HashMap::new();
         let mut video_inputs = HashMap::new();
         let mut connections = HashMap::new();
+        let mut output_to_input_connections: HashMap<String, Vec<String>> = HashMap::new();
 
         for (graph_id, graph) in self.inner.graphs.lock().await.iter() {
             graphs.insert(
@@ -565,6 +642,10 @@ impl PhaneronState {
         let inner_connections = self.inner.video_connections.lock().await.clone();
         for (input, output) in inner_connections.iter() {
             connections.insert(input.to_string(), output.to_string());
+            output_to_input_connections
+                .entry(output.to_string())
+                .or_default()
+                .push(input.to_string());
         }
 
         PhaneronStateRepresentation {
@@ -575,6 +656,7 @@ impl PhaneronState {
             video_outputs,
             video_inputs,
             connections,
+            output_to_input_connections,
         }
     }
 }

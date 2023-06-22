@@ -6,7 +6,17 @@ use crate::state::PhaneronNodeRepresentation;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PluginNotFound404Response {
+    pub not_found: String, // const: 'plugin'
     pub message: String,
+}
+
+impl PluginNotFound404Response {
+    pub fn new(plugin_id: String) -> Self {
+        Self {
+            not_found: "plugin".to_string(),
+            message: format!("Plugin {plugin_id} does not exist"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,10 +27,42 @@ pub struct GraphNotFound404Response {
 }
 
 impl GraphNotFound404Response {
-    pub fn new(message: String) -> Self {
+    pub fn new(graph_id: String) -> Self {
         Self {
             not_found: "graph".to_string(),
-            message,
+            message: format!("Graph {graph_id} does not exist"),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeNotFound404Response {
+    pub not_found: String, // const: 'node'
+    pub message: String,
+}
+
+impl NodeNotFound404Response {
+    pub fn new(node_id: String) -> Self {
+        Self {
+            not_found: "node".to_string(),
+            message: format!("Node {node_id} does not exist"),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InputNotFound404Response {
+    pub not_found: String, // const: 'node'
+    pub message: String,
+}
+
+impl InputNotFound404Response {
+    pub fn new(input_id: String) -> Self {
+        Self {
+            not_found: "input".to_string(),
+            message: format!("Input {input_id} does not exist"),
         }
     }
 }
@@ -45,6 +87,12 @@ impl NodeTypeNotFound404Response {
 #[serde(rename_all = "camelCase")]
 pub struct NodeTypeDoesNotMatch409Response {
     pub existing_node_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InputTypeDoesNotMatch409Response {
+    pub input_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -152,6 +200,14 @@ pub struct GetGraphNodes200Response {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetNodeInputConnection200Response {
+    pub id: String,
+    pub input_type: String,
+    pub connected_output_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GraphDescription {
     pub id: String,
     pub name: String,
@@ -215,6 +271,19 @@ pub struct GraphNodeInput {
     pub connected_output_id: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetGraphNodeOutputs200Response {
+    pub outputs: Vec<GraphNodeOutput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphNodeOutput {
+    pub id: String,
+    pub output_type: String,
+    pub connected_input_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddGraph200Response {
     pub id: String,
@@ -228,4 +297,11 @@ pub struct AddGraphNode200Response {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddOrUpdateGraphNode200Response {
     pub id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConnectGrahNodeInput200Response {
+    pub id: String,
+    pub input_type: String,
+    pub connected_output_id: Option<String>,
 }

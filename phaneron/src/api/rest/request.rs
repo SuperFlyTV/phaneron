@@ -100,8 +100,9 @@ pub struct ConnectGraphNodeInputParams {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConnectGraphNodeInputRequest {
-    #[serde(rename = "graphId")]
+    #[serde(rename = "connectFromNodeId")]
     pub connect_from_node_id: String,
+    #[serde(rename = "connectFromOutputId")]
     pub connect_from_output_id: String,
 }
 

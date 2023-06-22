@@ -21,8 +21,9 @@ use crate::api::rest::request::{
 };
 use crate::api::rest::response::{
     AvailablePluginNode, GetAvailablePluginNodes200Response, GetGraph200ResponseNode,
-    GetNodeState200Response, GraphNodeDescription, GraphNodeInput, PhaneronGraphNode,
-    PhaneronStateNodeAudioInput,
+    GetGraphNodeOutputs200Response, GetNodeInputConnection200Response, GetNodeState200Response,
+    GraphNodeDescription, GraphNodeInput, InputNotFound404Response,
+    InputTypeDoesNotMatch409Response, PhaneronGraphNode, PhaneronStateNodeAudioInput,
 };
 use crate::plugins::{PhaneronPluginsState, PluginId};
 use crate::state::{PhaneronState, PhaneronStateRepresentation};
@@ -42,6 +43,7 @@ use axum::{
     routing::get,
     Router,
 };
+use phaneron_plugin::{AudioInputId, AudioOutputId, VideoInputId, VideoOutputId};
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr},
@@ -69,9 +71,10 @@ use self::rest::request::{
 };
 use self::rest::response::{
     AddGraph200Response, AddGraphNode200Response, AddOrUpdateGraphNode200Response,
-    GetAvailablePlugins200Response, GetGraph200Response, GetGraphNodeInputs200Response,
-    GetGraphNodes200Response, GetGraphs200Response, GetPhaneronState200Response, GraphDescription,
-    GraphNotFound404Response, NodeTypeDoesNotMatch409Response, NodeTypeNotFound404Response,
+    ConnectGrahNodeInput200Response, GetAvailablePlugins200Response, GetGraph200Response,
+    GetGraphNodeInputs200Response, GetGraphNodes200Response, GetGraphs200Response,
+    GetPhaneronState200Response, GraphDescription, GraphNodeOutput, GraphNotFound404Response,
+    NodeNotFound404Response, NodeTypeDoesNotMatch409Response, NodeTypeNotFound404Response,
     PhaneronGraphNodeAudioInput, PhaneronGraphNodeAudioOutput, PhaneronGraphNodeVideoInput,
     PhaneronGraphNodeVideoOutput, PhaneronStateNodeAudioOutput, PhaneronStateNodeVideoInput,
     PhaneronStateNodeVideoOutput, PluginNotFound404Response, RegisterResponse,
@@ -164,8 +167,8 @@ pub async fn initialize_api(state_context: PhaneronState, plugins_context: &Arc<
 #[derive(Clone)]
 struct AppState {
     context: PhaneronState,
-    phaneron_state: Arc<Mutex<PhaneronStateRepresentation>>,
-    plugins_state: Arc<Mutex<PhaneronPluginsState>>,
+    phaneron_state: Arc<Mutex<PhaneronStateRepresentation>>, // TODO: Should be a RWLock
+    plugins_state: Arc<Mutex<PhaneronPluginsState>>,         // TODO: Should be a RWLock
     clients: Clients,
 }
 
@@ -441,9 +444,7 @@ async fn get_plugin_nodes(
         }
         None => (
             StatusCode::NOT_FOUND,
-            Json(PluginNotFound404Response {
-                message: format!("Plugin {plugin_id} does not exist"),
-            }),
+            Json(PluginNotFound404Response::new(plugin_id.to_string())),
         )
             .into_response(),
     }
@@ -501,9 +502,7 @@ async fn get_graph(state: State<AppState>, Path(graph_id): Path<String>) -> impl
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(GraphNotFound404Response::new(format!(
-                    "Graph {graph_id} not found"
-                ))),
+                Json(GraphNotFound404Response::new(graph_id)),
             )
                 .into_response();
         }
@@ -541,9 +540,7 @@ async fn get_graph_nodes(
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(GraphNotFound404Response::new(format!(
-                    "Graph {graph_id} not found"
-                ))),
+                Json(GraphNotFound404Response::new(graph_id)),
             )
                 .into_response();
         }
@@ -644,9 +641,7 @@ async fn get_graph_node(
     if graph.is_none() {
         return (
             StatusCode::NOT_FOUND,
-            Json(PluginNotFound404Response {
-                message: format!("Graph {graph_id} does not exist"),
-            }),
+            Json(GraphNotFound404Response::new(graph_id)),
         )
             .into_response();
     }
@@ -657,9 +652,7 @@ async fn get_graph_node(
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(PluginNotFound404Response {
-                    message: format!("Node {node_id} does not exist"),
-                }),
+                Json(NodeNotFound404Response::new(node_id)),
             )
                 .into_response()
         }
@@ -724,7 +717,7 @@ async fn add_or_update_graph_node(
     if !phaneron_state.graphs.contains_key(&graph_id.to_string()) {
         return (
             StatusCode::NOT_FOUND,
-            Json(GraphNotFound404Response::new(graph_id.to_string())),
+            Json(GraphNotFound404Response::new(graph_id)),
         )
             .into_response();
     }
@@ -785,7 +778,7 @@ async fn add_or_update_graph_node(
                 Err(err) => match err {
                     crate::state::AddNodeError::GraphDoesNotExist => (
                         StatusCode::NOT_FOUND,
-                        Json(GraphNotFound404Response::new(graph_id.to_string())),
+                        Json(GraphNotFound404Response::new(graph_id)),
                     )
                         .into_response(),
                     crate::state::AddNodeError::NodeTypeDoesNotExist => (
@@ -809,9 +802,7 @@ async fn get_graph_node_state(
     if graph.is_none() {
         return (
             StatusCode::NOT_FOUND,
-            Json(PluginNotFound404Response {
-                message: format!("Graph {graph_id} does not exist"),
-            }),
+            Json(GraphNotFound404Response::new(graph_id)),
         )
             .into_response();
     }
@@ -822,9 +813,7 @@ async fn get_graph_node_state(
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(PluginNotFound404Response {
-                    message: format!("Node {node_id} does not exist"),
-                }),
+                Json(NodeNotFound404Response::new(node_id)),
             )
                 .into_response()
         }
@@ -846,9 +835,7 @@ async fn get_graph_node_inputs(
     if graph.is_none() {
         return (
             StatusCode::NOT_FOUND,
-            Json(PluginNotFound404Response {
-                message: format!("Graph {graph_id} does not exist"),
-            }),
+            Json(GraphNotFound404Response::new(graph_id)),
         )
             .into_response();
     }
@@ -859,9 +846,7 @@ async fn get_graph_node_inputs(
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(PluginNotFound404Response {
-                    message: format!("Node {node_id} does not exist"),
-                }),
+                Json(NodeNotFound404Response::new(node_id)),
             )
                 .into_response()
         }
@@ -912,7 +897,60 @@ async fn get_graph_node_input_connections(
         input_id,
     }): Path<GetGraphNodeInputConnectionsParams>,
 ) -> impl IntoResponse {
-    unimplemented!()
+    let phaneron_state = state.phaneron_state.lock().await;
+    if !phaneron_state.graphs.contains_key(&graph_id.to_string()) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(GraphNotFound404Response::new(graph_id)),
+        )
+            .into_response();
+    }
+
+    if !phaneron_state.nodes.contains_key(&node_id) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(NodeNotFound404Response::new(node_id)),
+        )
+            .into_response();
+    };
+
+    let audio_inputs = phaneron_state.audio_inputs.get(&node_id).unwrap();
+    let video_inputs = phaneron_state.video_inputs.get(&node_id).unwrap();
+
+    let input_type = if audio_inputs.contains(&input_id) {
+        "audio".to_string()
+    } else if video_inputs.contains(&input_id) {
+        "video".to_string()
+    } else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(InputNotFound404Response::new(input_id)),
+        )
+            .into_response();
+    };
+
+    match phaneron_state.connections.get(&input_id) {
+        Some(connection) => (
+            StatusCode::OK,
+            Json(GetNodeInputConnection200Response {
+                id: input_id.clone(),
+                input_type,
+                connected_output_id: Some(connection.clone()),
+            }),
+        )
+            .into_response(),
+        None => (
+            StatusCode::OK,
+            Json(GetNodeInputConnection200Response {
+                id: input_id.clone(),
+                input_type,
+                connected_output_id: None,
+            }),
+        )
+            .into_response(),
+    };
+
+    todo!()
 }
 
 #[axum::debug_handler]
@@ -925,7 +963,116 @@ async fn connect_graph_node_input(
     }): Path<ConnectGraphNodeInputParams>,
     Json(body): Json<ConnectGraphNodeInputRequest>,
 ) -> impl IntoResponse {
-    unimplemented!()
+    let phaneron_state = state.phaneron_state.lock().await;
+    if !phaneron_state.graphs.contains_key(&graph_id.to_string()) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(GraphNotFound404Response::new(graph_id)),
+        )
+            .into_response();
+    }
+
+    if !phaneron_state.nodes.contains_key(&node_id) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(NodeNotFound404Response::new(node_id)),
+        )
+            .into_response();
+    };
+
+    if !phaneron_state
+        .nodes
+        .contains_key(&body.connect_from_node_id)
+    {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(NodeNotFound404Response::new(body.connect_from_node_id)),
+        )
+            .into_response();
+    };
+
+    let audio_inputs = phaneron_state.audio_inputs.get(&node_id).unwrap();
+    let video_inputs = phaneron_state.video_inputs.get(&node_id).unwrap();
+
+    let input_is_audio = if audio_inputs.contains(&input_id) {
+        true
+    } else if video_inputs.contains(&input_id) {
+        false
+    } else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(InputNotFound404Response::new(input_id)),
+        )
+            .into_response();
+    };
+
+    let from_node_outputs = if input_is_audio {
+        phaneron_state
+            .audio_outputs
+            .get(&body.connect_from_node_id)
+            .cloned()
+            .unwrap_or_default()
+    } else {
+        phaneron_state
+            .video_outputs
+            .get(&body.connect_from_node_id)
+            .cloned()
+            .unwrap_or_default()
+    };
+
+    if !from_node_outputs.contains(&body.connect_from_output_id) {
+        let input_type = if input_is_audio {
+            "audio".to_string()
+        } else {
+            "video".to_string()
+        };
+        return (
+            StatusCode::NOT_FOUND,
+            Json(InputTypeDoesNotMatch409Response { input_type }),
+        )
+            .into_response();
+    }
+
+    let result = if input_is_audio {
+        state
+            .context
+            .make_audio_connection(
+                &NodeId::new_from(body.connect_from_node_id),
+                &AudioOutputId::new_from(body.connect_from_output_id.clone().into()),
+                &NodeId::new_from(node_id),
+                &AudioInputId::new_from(input_id.clone().into()),
+            )
+            .await
+    } else {
+        state
+            .context
+            .make_video_connection(
+                &NodeId::new_from(body.connect_from_node_id),
+                &VideoOutputId::new_from(body.connect_from_output_id.clone().into()),
+                &NodeId::new_from(node_id),
+                &VideoInputId::new_from(input_id.clone().into()),
+            )
+            .await
+    };
+
+    if result.is_ok() {
+        let input_type = if input_is_audio {
+            "audio".to_string()
+        } else {
+            "video".to_string()
+        };
+        (
+            StatusCode::OK,
+            Json(ConnectGrahNodeInput200Response {
+                id: input_id.clone(),
+                input_type,
+                connected_output_id: Some(body.connect_from_output_id),
+            }),
+        )
+            .into_response()
+    } else {
+        todo!("Handle error from making connections")
+    }
 }
 
 #[axum::debug_handler]
@@ -945,5 +1092,63 @@ async fn get_graph_node_outputs(
     state: State<AppState>,
     Path(GetGraphNodeOutputsParams { graph_id, node_id }): Path<GetGraphNodeOutputsParams>,
 ) -> impl IntoResponse {
-    unimplemented!()
+    let phaneron_state = state.phaneron_state.lock().await;
+    if !phaneron_state.graphs.contains_key(&graph_id.to_string()) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(GraphNotFound404Response::new(graph_id)),
+        )
+            .into_response();
+    }
+
+    if !phaneron_state.nodes.contains_key(&node_id) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(NodeNotFound404Response::new(node_id)),
+        )
+            .into_response();
+    };
+
+    let audio_inputs = phaneron_state
+        .audio_inputs
+        .get(&node_id)
+        .cloned()
+        .unwrap_or_default();
+
+    let audio_inputs: Vec<GraphNodeOutput> = audio_inputs
+        .iter()
+        .map(|input_id| GraphNodeOutput {
+            id: input_id.clone(),
+            output_type: "audio".to_string(),
+            connected_input_ids: phaneron_state
+                .output_to_input_connections
+                .get(input_id)
+                .cloned()
+                .unwrap_or_default(),
+        })
+        .collect();
+
+    let video_inputs = phaneron_state
+        .video_inputs
+        .get(&node_id)
+        .cloned()
+        .unwrap_or_default();
+
+    let video_inputs: Vec<GraphNodeOutput> = video_inputs
+        .iter()
+        .map(|input_id| GraphNodeOutput {
+            id: input_id.clone(),
+            output_type: "video".to_string(),
+            connected_input_ids: phaneron_state
+                .output_to_input_connections
+                .get(input_id)
+                .cloned()
+                .unwrap_or_default(),
+        })
+        .collect();
+
+    Json(GetGraphNodeOutputs200Response {
+        outputs: vec![audio_inputs, video_inputs].concat(),
+    })
+    .into_response()
 }

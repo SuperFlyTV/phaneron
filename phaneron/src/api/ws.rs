@@ -118,7 +118,7 @@ async fn client_msg(state_context: PhaneronState, id: &Uuid, msg: Message, clien
             debug!("NodeState req: {:?}", state);
             state_context
                 .set_node_state(
-                    &GraphId::new_from("graph1".to_string()), // TODO: Remove hard-coded value
+                    &GraphId::new_from(state.graph_id),
                     &NodeId::new_from(state.node_id),
                     state.state,
                 )

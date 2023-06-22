@@ -424,6 +424,17 @@ resources:
                   - $ref: '#/components/schemas/graphNotFound'
                   - $ref: '#/components/schemas/graphNodeNotFound'
                   - $ref: '#/components/schemas/inputNotFound'
+        409:
+          description: Input type and output type do not match
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inputType: string
+                required:
+                  - inputType
+                additionalProperties: false
     delete:
       operationId: disconnectNodeInput
       tags:
@@ -665,11 +676,11 @@ components:
         notFound:
           type: string
           const: node_type
-        invalidNodeType:
+        nodeType:
           type: string
       required:
         - notFound
-        - invalidNodeType
+        - nodeType
       additionalProperties: false
   responses:
     graphAdded:

@@ -473,13 +473,14 @@ async fn add_media(
     state: State<AppState>,
     Json(body): Json<RTCSessionDescription>,
 ) -> impl IntoResponse {
+    let stream_id = format!("phaneron-{}", uuid::Uuid::new_v4());
     let video_track = Arc::new(TrackLocalStaticSample::new(
         RTCRtpCodecCapability {
             mime_type: MIME_TYPE_VP8.to_owned(),
             ..Default::default()
         },
         format!("video-{}", uuid::Uuid::new_v4()),
-        format!("video-{}", uuid::Uuid::new_v4()),
+        stream_id.clone(),
     ));
 
     let rtp_sender = match state
@@ -514,7 +515,7 @@ async fn add_media(
             ..Default::default()
         },
         format!("audio-{}", uuid::Uuid::new_v4()),
-        format!("audio-{}", uuid::Uuid::new_v4()),
+        stream_id.clone(),
     ));
 
     let rtp_sender = match state

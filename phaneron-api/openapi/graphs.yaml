@@ -551,6 +551,8 @@ components:
           type: string
         state:
           type: string
+        configuration:
+          type: string
         audioInputs:
           type: array
           description: Array of inputs.

@@ -148,6 +148,8 @@ components:
             type: string
           state:
             type: string
+          configuration:
+            type: string
         required:
           - name
           - state

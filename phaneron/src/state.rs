@@ -58,6 +58,7 @@ pub struct PhaneronNodeRepresentation {
     pub node_type: String,
     pub name: String,
     pub state: String,
+    pub configuration: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -593,6 +594,7 @@ impl PhaneronState {
         }
 
         let inner_node_states = self.inner.node_states.lock().await.clone();
+        let inner_node_configurations = self.inner.node_configurations.lock().await.clone();
         for (node_id, node) in self.inner.nodes.lock().await.iter() {
             let node_state = inner_node_states.get(node_id);
             if let Some(node_state) = node_state {
@@ -602,6 +604,7 @@ impl PhaneronState {
                         node_type: node.node_type.clone(),
                         name: node.name.clone(),
                         state: node_state.clone(),
+                        configuration: inner_node_configurations.get(node_id).cloned(),
                     },
                 );
             }
@@ -666,6 +669,7 @@ struct PhaneronStateInner {
     graphs: Mutex<HashMap<GraphId, PhaneronStateGraph>>,
     nodes: Mutex<HashMap<NodeId, PhaneronStateNode>>,
     node_states: Mutex<HashMap<NodeId, String>>,
+    node_configurations: Mutex<HashMap<NodeId, String>>,
     audio_inputs: Mutex<HashMap<NodeId, Vec<AudioInputId>>>,
     audio_outputs: Mutex<HashMap<NodeId, Vec<AudioOutputId>>>,
     video_inputs: Mutex<HashMap<NodeId, Vec<VideoInputId>>>,
@@ -688,6 +692,7 @@ impl PhaneronStateInner {
             graphs: Default::default(),
             nodes: Default::default(),
             node_states: Default::default(),
+            node_configurations: Default::default(),
             audio_inputs: Default::default(),
             audio_outputs: Default::default(),
             video_inputs: Default::default(),

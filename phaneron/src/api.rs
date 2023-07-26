@@ -555,6 +555,7 @@ async fn get_graph_nodes(
             name: node.name.clone(),
             node_type: node.node_type.clone(),
             state: node.state.clone(),
+            configuration: node.configuration.clone(),
             audio_inputs: phaneron_state
                 .audio_inputs
                 .get(node_id)
@@ -663,6 +664,7 @@ async fn get_graph_node(
         name: node.name.clone(),
         node_type: node.node_type.clone(),
         state: node.state.clone(),
+        configuration: node.configuration.clone(),
         audio_inputs: phaneron_state
             .audio_inputs
             .get(&node_id)
@@ -821,6 +823,7 @@ async fn get_graph_node_state(
 
     Json(GetNodeState200Response {
         state: node.state.clone(),
+        configuration: node.configuration.clone(),
     })
     .into_response()
 }

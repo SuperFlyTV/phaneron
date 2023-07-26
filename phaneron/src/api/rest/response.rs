@@ -110,6 +110,7 @@ pub struct GetPhaneronState200Response {
 pub struct PhaneronStateNode {
     pub name: String,
     pub state: String,
+    pub configuration: Option<String>,
     pub node_type: String,
 }
 
@@ -118,6 +119,7 @@ impl From<PhaneronNodeRepresentation> for PhaneronStateNode {
         PhaneronStateNode {
             name: value.name,
             state: value.state,
+            configuration: value.configuration,
             node_type: value.node_type,
         }
     }
@@ -227,6 +229,7 @@ pub struct PhaneronGraphNode {
     pub name: String,
     pub node_type: String,
     pub state: String,
+    pub configuration: Option<String>,
     pub audio_inputs: Vec<PhaneronGraphNodeAudioInput>,
     pub video_inputs: Vec<PhaneronGraphNodeVideoInput>,
     pub audio_outputs: Vec<PhaneronGraphNodeAudioOutput>,
@@ -256,6 +259,7 @@ pub struct PhaneronGraphNodeVideoOutput {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetNodeState200Response {
     pub state: String,
+    pub configuration: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -130,13 +130,15 @@ impl phaneron_plugin::traits::Node for DecklinkConsumer {
         let video_input = frame_context.get_video_input(&self.video_input).unwrap();
 
         let mut from_rgba_lock = self.from_rgba.lock().unwrap();
-        let from_rgba = from_rgba_lock.get_or_insert(self.context.create_from_rgba(
-            &VideoFormat::BGRA8,
-            &ColourSpace::sRGB.colour_spec(),
-            1920,
-            1080,
-            InterlaceMode::Progressive,
-        ));
+        let from_rgba = from_rgba_lock.get_or_insert_with(|| {
+            self.context.create_from_rgba(
+                &VideoFormat::BGRA8,
+                &ColourSpace::sRGB.colour_spec(),
+                1920,
+                1080,
+                InterlaceMode::Progressive,
+            )
+        });
 
         let video_frame = frame_context
             .get_video_input(&self.video_input)

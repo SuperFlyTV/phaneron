@@ -226,18 +226,20 @@ impl phaneron_plugin::traits::Node for WebRTCConsumer {
         });
 
         let mut from_rgba_lock = self.from_rgba.lock().unwrap();
-        let from_rgba = from_rgba_lock.get_or_insert(self.context.create_from_rgba(
-            &VideoFormat::YUV420p,
-            &ColourSpace::sRGB.colour_spec(),
-            1920,
-            1080,
-            InterlaceMode::Progressive,
-        ));
+        let from_rgba = from_rgba_lock.get_or_insert_with(|| {
+            self.context.create_from_rgba(
+                &VideoFormat::YUV420p,
+                &ColourSpace::sRGB.colour_spec(),
+                1920,
+                1080,
+                InterlaceMode::Progressive,
+            )
+        });
         let mut from_audio_f32_lock = self.from_audio_f32.lock().unwrap();
-        let from_audio_f32 = from_audio_f32_lock.get_or_insert(
+        let from_audio_f32 = from_audio_f32_lock.get_or_insert_with(|| {
             self.context
-                .create_from_audio_f32(AudioFormat::I16, AudioChannelLayout::Mono),
-        );
+                .create_from_audio_f32(AudioFormat::I16, AudioChannelLayout::Mono)
+        });
         let mut start_lock = self.start.lock().unwrap();
         let start = start_lock.get_or_insert(Instant::now());
 

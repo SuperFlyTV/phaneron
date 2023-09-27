@@ -51,7 +51,7 @@ pub struct FFmpegProducerState {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DecklinkConsumerConfiguration {
+pub struct DecklinkConsumerState {
     pub device_index: usize,
 }
 
@@ -155,10 +155,8 @@ async fn main() {
             node_id: "active_input_decklink_consumer".to_string(),
             node_type: "decklink_consumer".to_string(),
             node_name: None,
-            state: Some("".into()),
-            configuration: Some(
-                serde_json::to_string(&DecklinkConsumerConfiguration { device_index: 0 }).unwrap(),
-            ),
+            state: Some(serde_json::to_string(&DecklinkConsumerState { device_index: 0 }).unwrap()),
+            configuration: None,
         },
         CreateNode {
             node_id: "switcher".to_string(),

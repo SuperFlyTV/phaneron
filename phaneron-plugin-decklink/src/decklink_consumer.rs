@@ -31,7 +31,7 @@ use phaneron_plugin::{
 };
 use tracing::{debug, info};
 
-use crate::decklink_consumer_config::DecklinkConsumerConfiguration;
+use crate::decklink_consumer_config::DecklinkConsumerState;
 use crate::decklink_consumer_thread::{
     create_decklink_thread, DecklinkThreadMessage, VideoFrameMessage,
 };
@@ -45,11 +45,8 @@ impl DecklinkConsumerHandle {
     }
 }
 impl phaneron_plugin::traits::NodeHandle for DecklinkConsumerHandle {
-    fn initialize(&self, context: NodeContext, configuration: ROption<RString>) -> Node {
-        let configuration: DecklinkConsumerConfiguration =
-            serde_json::from_str(&configuration.unwrap()).unwrap();
-
-        let node = DecklinkConsumer::new(self.node_id.clone(), context, configuration);
+    fn initialize(&self, context: NodeContext, _configuration: ROption<RString>) -> Node {
+        let node = DecklinkConsumer::new(self.node_id.clone(), context);
 
         Node_TO::from_value(node, TD_Opaque)
     }
@@ -63,7 +60,6 @@ struct DecklinkOutputWrapper {
 pub struct DecklinkConsumer {
     node_id: String,
     context: NodeContext,
-    configuration: DecklinkConsumerConfiguration,
 
     video_input: VideoInputId,
     audio_input: AudioInputId,
@@ -74,11 +70,7 @@ pub struct DecklinkConsumer {
 }
 
 impl DecklinkConsumer {
-    pub fn new(
-        node_id: String,
-        context: NodeContext,
-        configuration: DecklinkConsumerConfiguration,
-    ) -> Self {
+    pub fn new(node_id: String, context: NodeContext) -> Self {
         // TODO - can these be done in `apply_state` once we know something about the device?
         let video_input = context.add_video_input();
         let audio_input = context.add_audio_input();
@@ -86,7 +78,6 @@ impl DecklinkConsumer {
         Self {
             node_id,
             context,
-            configuration,
 
             video_input,
             audio_input,
@@ -111,13 +102,15 @@ impl DecklinkConsumer {
 }
 
 impl phaneron_plugin::traits::Node for DecklinkConsumer {
-    fn apply_state(&self, _state: RString) -> bool {
+    fn apply_state(&self, state: RString) -> bool {
         let mut current_device = self.decklink.lock().unwrap();
         if current_device.is_some() {
             return false;
         }
 
-        let (decklink_thread, message_sender) = create_decklink_thread(self.configuration.clone());
+        let state: DecklinkConsumerState = serde_json::from_str(&state).unwrap();
+
+        let (decklink_thread, message_sender) = create_decklink_thread(state);
 
         *current_device = Some(DecklinkOutputWrapper {
             thread: decklink_thread,
@@ -127,8 +120,6 @@ impl phaneron_plugin::traits::Node for DecklinkConsumer {
         false
     }
     fn process_frame(&self, frame_context: ProcessFrameContext) {
-        let video_input = frame_context.get_video_input(&self.video_input).unwrap();
-
         let mut from_rgba_lock = self.from_rgba.lock().unwrap();
         let from_rgba = from_rgba_lock.get_or_insert_with(|| {
             self.context.create_from_rgba(

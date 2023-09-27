@@ -28,7 +28,7 @@ use decklink::frame::{
 // use tokio::time::{Instant, MissedTickBehavior};
 use tracing::info;
 
-use crate::decklink_consumer_config::DecklinkConsumerConfiguration;
+use crate::decklink_consumer_config::DecklinkConsumerState;
 
 const MESSAGE_BUFFER_SIZE: usize = 2;
 pub enum DecklinkThreadMessage {
@@ -41,7 +41,7 @@ pub struct VideoFrameMessage {
 }
 
 pub fn create_decklink_thread(
-    configuration: DecklinkConsumerConfiguration,
+    config: DecklinkConsumerState,
 ) -> (JoinHandle<()>, SyncSender<DecklinkThreadMessage>) {
     let (message_sender, message_receiver) =
         std::sync::mpsc::sync_channel::<DecklinkThreadMessage>(MESSAGE_BUFFER_SIZE);
@@ -50,12 +50,12 @@ pub fn create_decklink_thread(
         let decklink_devices = decklink::device::get_devices().expect("Device query failed");
         let decklink_device = decklink_devices
             .into_iter()
-            .nth(configuration.device_index)
+            .nth(config.device_index)
             .expect("Invalid device index");
 
         info!(
             "Opened decklink #{} {:?} {:?}",
-            configuration.device_index,
+            config.device_index,
             decklink_device.model_name(),
             decklink_device.display_name()
         );

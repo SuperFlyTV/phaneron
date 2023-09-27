@@ -51,6 +51,12 @@ pub struct FFmpegProducerState {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DecklinkConsumerConfiguration {
+    pub device_index: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "transition")]
 pub enum TraditionalMixerEmulatorTransition {
     Mix { position: f32 },
@@ -149,8 +155,10 @@ async fn main() {
             node_id: "active_input_decklink_consumer".to_string(),
             node_type: "decklink_consumer".to_string(),
             node_name: None,
-            state: None,
-            configuration: None,
+            state: Some("".into()),
+            configuration: Some(
+                serde_json::to_string(&DecklinkConsumerConfiguration { device_index: 0 }).unwrap(),
+            ),
         },
         CreateNode {
             node_id: "switcher".to_string(),

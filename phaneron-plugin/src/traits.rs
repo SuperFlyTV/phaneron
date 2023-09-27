@@ -7,7 +7,7 @@ pub use crate::{
 };
 use abi_stable::{
     sabi_trait,
-    std_types::{RHashMap, ROption, RResult, RSlice, RStr, RString, RVec},
+    std_types::{ROption, RResult, RSlice, RStr, RString, RVec},
     StableAbi,
 };
 

@@ -1,6 +1,6 @@
 use super::ColourSpec;
 
-/// Colour space transformation for BT.709.
+/// Colour space transformation for BT.2020.
 /// Reference: <https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.2020-2-201510-I!!PDF-E.pdf>
 pub const COLOUR_SPEC_BT_2020: ColourSpec = ColourSpec {
     kR: 0.2627,

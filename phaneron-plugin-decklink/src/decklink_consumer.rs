@@ -16,32 +16,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::net::Ipv4Addr;
 use std::sync::mpsc::SyncSender;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use abi_stable::sabi_trait::TD_Opaque;
-use abi_stable::std_types::{ROption, RString};
-use decklink::device::output::{
-    DecklinkOutputDevice, DecklinkOutputDeviceVideoScheduled, DecklinkOutputDeviceVideoSync,
-    DecklinkVideoOutputFlags,
-};
-use decklink::device::DecklinkDevice;
-use decklink::display_mode::DecklinkDisplayModeId;
-use phaneron_plugin::types::{FromAudioF32, FromRGBA, NodeContext};
+use abi_stable::std_types::{ROption, RString, RVec};
+use decklink::frame::DecklinkAlignedVec;
+use phaneron_plugin::types::{FromRGBA, NodeContext};
 use phaneron_plugin::{
-    traits::Node_TO, types::Node, types::ProcessFrameContext, AudioChannelLayout, AudioFormat,
-    AudioInputId, ColourSpace, InterlaceMode, VideoFormat, VideoInputId,
+    traits::Node_TO, types::Node, types::ProcessFrameContext, AudioInputId, ColourSpace,
+    InterlaceMode, VideoFormat, VideoInputId,
 };
-use serde::{Deserialize, Serialize};
-// use tokio::time::{Instant, MissedTickBehavior};
 use tracing::{debug, info};
 
 use crate::decklink_consumer_config::DecklinkConsumerConfiguration;
-use crate::decklink_consumer_thread::{create_decklink_thread, DecklinkThreadMessage};
+use crate::decklink_consumer_thread::{
+    create_decklink_thread, DecklinkThreadMessage, VideoFrameMessage,
+};
 
 pub struct DecklinkConsumerHandle {
     node_id: String,
@@ -75,6 +68,8 @@ pub struct DecklinkConsumer {
     video_input: VideoInputId,
     audio_input: AudioInputId,
 
+    from_rgba: Mutex<Option<FromRGBA>>,
+
     decklink: Mutex<Option<DecklinkOutputWrapper>>,
 }
 
@@ -92,9 +87,25 @@ impl DecklinkConsumer {
             node_id,
             context,
             configuration,
+
             video_input,
             audio_input,
+
+            from_rgba: Default::default(),
+
             decklink: Mutex::default(),
+        }
+    }
+
+    pub fn destroy(&mut self) {
+        let mut device = self.decklink.lock().unwrap();
+        if let Some(device) = device.take() {
+            device
+                .send
+                .send(DecklinkThreadMessage::Terminate)
+                .expect("Send failed");
+
+            device.thread.join().expect("Join failed");
         }
     }
 }
@@ -118,15 +129,51 @@ impl phaneron_plugin::traits::Node for DecklinkConsumer {
     fn process_frame(&self, frame_context: ProcessFrameContext) {
         let video_input = frame_context.get_video_input(&self.video_input).unwrap();
 
-        let device = self.decklink.lock().unwrap();
-        if let Some(device) = &*device {
-            // TODO
-            info!("TODO frame");
+        let mut from_rgba_lock = self.from_rgba.lock().unwrap();
+        let from_rgba = from_rgba_lock.get_or_insert(self.context.create_from_rgba(
+            &VideoFormat::BGRA8,
+            &ColourSpace::sRGB.colour_spec(),
+            1920,
+            1080,
+            InterlaceMode::Progressive,
+        ));
 
+        let video_frame = frame_context
+            .get_video_input(&self.video_input)
+            .unwrap_or(frame_context.get_black_frame())
+            .clone();
+        let video_frame = from_rgba.process_frame(&frame_context, video_frame.frame);
+
+        let copy_context = frame_context.submit().unwrap();
+
+        let video_frame = from_rgba.copy_frame(&copy_context, video_frame);
+        let video_frame = into_decklink_avec(video_frame);
+
+        let device: std::sync::MutexGuard<'_, Option<DecklinkOutputWrapper>> =
+            self.decklink.lock().unwrap();
+        if let Some(device) = &*device {
             device
                 .send
-                .send(DecklinkThreadMessage::VideoFrame)
+                .send(DecklinkThreadMessage::VideoFrame(VideoFrameMessage {
+                    frame: video_frame,
+                }))
                 .expect("Send failed");
         }
     }
+}
+
+fn into_decklink_avec(input: RVec<RVec<u8>>) -> DecklinkAlignedVec {
+    let total_size: usize = input.iter().map(|v| v.len()).sum();
+
+    // HACK: should not use internal methods like this
+    let mut result = DecklinkAlignedVec::__from_elem(64, 0, total_size);
+
+    // This is a crude attempt to perform the concat in a reasonably performant way
+    let mut offset = 0;
+    for buffer in input {
+        result[offset..(offset + buffer.len())].copy_from_slice(&buffer);
+        offset += buffer.len()
+    }
+
+    result
 }

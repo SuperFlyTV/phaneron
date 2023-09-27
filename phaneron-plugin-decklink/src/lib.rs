@@ -73,6 +73,6 @@ impl phaneron_plugin::traits::PhaneronPlugin for BlackmagicDeckLinkPlugin {
     }
 
     fn destroy_node(&self, node_id: RString) -> RResult<(), RString> {
-        todo!()
+        todo!() // Call destroy() method
     }
 }

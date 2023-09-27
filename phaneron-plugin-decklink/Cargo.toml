@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 abi_stable = "0.11.1"
+aligned-vec = "0.5"
 anyhow = "1.0.70"
 decklink = { version = "*", path = "../../decklink-rs" }
 log = "0.4.17"

@@ -22,6 +22,9 @@ use std::thread::JoinHandle;
 use decklink::device::output::DecklinkVideoOutputFlags;
 use decklink::display_mode::DecklinkDisplayModeId;
 
+use decklink::frame::{
+    DecklinkAlignedVec, DecklinkFrameFlags, DecklinkPixelFormat, DecklinkVideoMutableFrame,
+};
 // use tokio::time::{Instant, MissedTickBehavior};
 use tracing::info;
 
@@ -30,7 +33,11 @@ use crate::decklink_consumer_config::DecklinkConsumerConfiguration;
 const MESSAGE_BUFFER_SIZE: usize = 2;
 pub enum DecklinkThreadMessage {
     Terminate,
-    VideoFrame,
+    VideoFrame(VideoFrameMessage),
+}
+
+pub struct VideoFrameMessage {
+    pub frame: DecklinkAlignedVec,
 }
 
 pub fn create_decklink_thread(
@@ -67,7 +74,20 @@ pub fn create_decklink_thread(
 
             match packet {
                 DecklinkThreadMessage::Terminate => break,
-                DecklinkThreadMessage::VideoFrame => {}
+                DecklinkThreadMessage::VideoFrame(frame) => {
+                    // info!("frame {} bytes!", frame.frame.len());
+
+                    let mut decklink_frame = Box::new(DecklinkVideoMutableFrame::create(
+                        1920,
+                        1080,
+                        1920 * 4,
+                        DecklinkPixelFormat::Format8BitBGRA,
+                        DecklinkFrameFlags::empty(),
+                    ));
+                    decklink_frame.set_bytes(frame.frame).unwrap();
+
+                    video_output.display_custom_frame(decklink_frame).unwrap();
+                }
             }
         }
 

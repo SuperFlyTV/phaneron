@@ -40,6 +40,8 @@ use phaneron_plugin::{
 use self::decklink_consumer::DecklinkConsumerHandle;
 
 mod decklink_consumer;
+mod decklink_consumer_config;
+mod decklink_consumer_thread;
 
 #[export_root_module]
 fn instantiate_root_module() -> PhaneronPluginRootModuleRef {

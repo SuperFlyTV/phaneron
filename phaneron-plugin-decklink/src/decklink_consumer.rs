@@ -17,6 +17,7 @@
  */
 
 use std::net::Ipv4Addr;
+use std::sync::mpsc::SyncSender;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
@@ -39,11 +40,8 @@ use serde::{Deserialize, Serialize};
 // use tokio::time::{Instant, MissedTickBehavior};
 use tracing::{debug, info};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct DecklinkConsumerConfiguration {
-    pub device_index: usize,
-}
+use crate::decklink_consumer_config::DecklinkConsumerConfiguration;
+use crate::decklink_consumer_thread::{create_decklink_thread, DecklinkThreadMessage};
 
 pub struct DecklinkConsumerHandle {
     node_id: String,
@@ -66,8 +64,7 @@ impl phaneron_plugin::traits::NodeHandle for DecklinkConsumerHandle {
 
 struct DecklinkOutputWrapper {
     pub thread: JoinHandle<()>,
-    // pub output: DecklinkOutputDevice,
-    // pub video: Box<dyn DecklinkOutputDeviceVideoSync>,
+    pub send: SyncSender<DecklinkThreadMessage>,
 }
 
 pub struct DecklinkConsumer {
@@ -109,40 +106,11 @@ impl phaneron_plugin::traits::Node for DecklinkConsumer {
             return false;
         }
 
-        let configuration = self.configuration.clone();
-
-        let decklink_thread = std::thread::spawn(move || {
-            let decklink_devices = decklink::device::get_devices().expect("Device query failed");
-            let decklink_device = decklink_devices
-                .into_iter()
-                .nth(configuration.device_index)
-                .expect("Invalid device index");
-
-            info!(
-                "Opened decklink #{} {:?} {:?}",
-                configuration.device_index,
-                decklink_device.model_name(),
-                decklink_device.display_name()
-            );
-
-            let output = decklink_device.output().expect("Failed to open output");
-
-            let video_output = output
-                .enable_video_output_sync(
-                    DecklinkDisplayModeId::HD1080p50,
-                    DecklinkVideoOutputFlags::empty(),
-                )
-                .expect("Failed to enable video output");
-
-            loop {
-                //
-            }
-
-            //
-        });
+        let (decklink_thread, message_sender) = create_decklink_thread(self.configuration.clone());
 
         *current_device = Some(DecklinkOutputWrapper {
             thread: decklink_thread,
+            send: message_sender,
         });
 
         false
@@ -154,6 +122,11 @@ impl phaneron_plugin::traits::Node for DecklinkConsumer {
         if let Some(device) = &*device {
             // TODO
             info!("TODO frame");
+
+            device
+                .send
+                .send(DecklinkThreadMessage::VideoFrame)
+                .expect("Send failed");
         }
     }
 }

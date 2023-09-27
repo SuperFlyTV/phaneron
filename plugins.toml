@@ -1,5 +1,6 @@
 plugins = [
     "phaneron_plugin_demo",
     "phaneron_plugin_ffmpeg",
-    "phaneron_plugin_webrtc"
+    "phaneron_plugin_webrtc",
+    "phaneron_plugin_decklink"
 ]

@@ -1968,6 +1968,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "phaneron-plugin-decklink"
+version = "0.1.2"
+dependencies = [
+ "abi_stable",
+ "anyhow",
+ "log",
+ "phaneron-plugin",
+ "phaneron-plugin-utils",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "phaneron-plugin-demo"
 version = "0.1.2"
 dependencies = [

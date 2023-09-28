@@ -64,11 +64,23 @@ impl phaneron_plugin::traits::PhaneronPlugin for BlackmagicDeckLinkPlugin {
             Ok(version) => {
                 info!("Loaded Decklink driver {}", version);
 
-                vec![PluginNodeDescription {
-                    id: "decklink_consumer".into(),
-                    name: "DeckLink Consumer".into(),
-                }]
-                .into()
+                let devices = decklink::device::get_devices();
+                match devices {
+                    Ok(devices) => {
+                        info!("Found {} Decklink devices", devices.len());
+
+                        vec![PluginNodeDescription {
+                            id: "decklink_consumer".into(),
+                            name: "DeckLink Consumer".into(),
+                        }]
+                        .into()
+                    }
+                    Err(_) => {
+                        warn!("Failed to enumerate Decklink devices");
+
+                        vec![].into()
+                    }
+                }
             }
             Err(_) => {
                 warn!("Unable to load Decklink driver");

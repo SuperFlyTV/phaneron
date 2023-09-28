@@ -29,6 +29,7 @@ use abi_stable::{
         RString, RVec,
     },
 };
+use log::{info, warn};
 use phaneron_plugin::{
     traits::{CreateNodeDescription, PhaneronPlugin_TO},
     traits::{NodeHandle_TO, PluginNodeDescription},
@@ -59,11 +60,22 @@ pub fn load(context: PhaneronPluginContext) -> RResult<PhaneronPlugin, RString> 
 struct BlackmagicDeckLinkPlugin {}
 impl phaneron_plugin::traits::PhaneronPlugin for BlackmagicDeckLinkPlugin {
     fn get_available_node_types(&self) -> RVec<PluginNodeDescription> {
-        vec![PluginNodeDescription {
-            id: "decklink_consumer".into(),
-            name: "DeckLink Consumer".into(),
-        }]
-        .into()
+        match decklink::api_version() {
+            Ok(version) => {
+                info!("Loaded Decklink driver {}", version);
+
+                vec![PluginNodeDescription {
+                    id: "decklink_consumer".into(),
+                    name: "DeckLink Consumer".into(),
+                }]
+                .into()
+            }
+            Err(_) => {
+                warn!("Unable to load Decklink driver");
+
+                vec![].into()
+            }
+        }
     }
 
     fn create_node(&self, description: CreateNodeDescription) -> RResult<NodeHandle, RString> {

@@ -4,6 +4,7 @@ members = [
     "phaneron-plugin",
     "phaneron-plugin-utils",
     "phaneron-plugin-demo",
+    "phaneron-plugin-decklink",
     "phaneron-plugin-ffmpeg",
     "phaneron-plugin-webrtc",
 ]
@@ -12,6 +13,7 @@ default-members = [
     "phaneron-plugin",
     "phaneron-plugin-utils",
     "phaneron-plugin-demo",
+    "phaneron-plugin-decklink",
     "phaneron-plugin-ffmpeg",
     "phaneron-plugin-webrtc",
 ]

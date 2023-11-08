@@ -51,6 +51,12 @@ pub struct FFmpegProducerState {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DecklinkConsumerState {
+    pub device_index: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "transition")]
 pub enum TraditionalMixerEmulatorTransition {
     Mix { position: f32 },
@@ -146,10 +152,10 @@ async fn main() {
     let graph_id = phaneron::GraphId::new_from("graph1".to_string());
     let mut create_nodes = vec![
         CreateNode {
-            node_id: "active_input_webrtc_consumer".to_string(),
-            node_type: "webrtc_consumer".to_string(),
+            node_id: "active_input_decklink_consumer".to_string(),
+            node_type: "decklink_consumer".to_string(),
             node_name: None,
-            state: None,
+            state: Some(serde_json::to_string(&DecklinkConsumerState { device_index: 0 }).unwrap()),
             configuration: None,
         },
         CreateNode {
@@ -191,7 +197,7 @@ async fn main() {
             connection_type: CreateConnectionType::Video,
             from_node_id: "flipper".to_string(),
             from_output_index: 0,
-            to_node_id: "active_input_webrtc_consumer".to_string(),
+            to_node_id: "active_input_decklink_consumer".to_string(),
             to_input_index: 0,
         },
     ];
@@ -223,7 +229,7 @@ async fn main() {
                 connection_type: CreateConnectionType::Audio,
                 from_node_id: ffmpeg_producer_id.to_string(),
                 from_output_index: 0,
-                to_node_id: "active_input_webrtc_consumer".to_string(),
+                to_node_id: "active_input_decklink_consumer".to_string(),
                 to_input_index: 0,
             });
         }

@@ -2,3 +2,5 @@
 /target
 video_inputs.json
 .env
+*.mxf
+*.mp4
